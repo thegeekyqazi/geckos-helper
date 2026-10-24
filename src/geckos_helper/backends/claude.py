@@ -62,6 +62,7 @@ class ClaudeBackend:
             "--append-system-prompt-file", str(paths.SYSTEM_PROMPT_FILE),
             "--mcp-config", str(paths.MCP_CONFIG_FILE),
             "--settings", str(paths.CLAUDE_SETTINGS),
+            "--add-dir", str(paths.DATA_DIR / "attachments"),  # attached files are read from here
         ]
         if c.get("model"):
             argv += ["--model", c["model"]]
@@ -89,11 +90,12 @@ class ClaudeBackend:
         self.proc.stdin.write((json.dumps(obj) + "\n").encode())
         await self.proc.stdin.drain()
 
-    async def prompt(self, text: str) -> None:
+    async def prompt(self, content: str | list[dict]) -> None:
+        """content: plain text, or a list of content blocks (text, images) for attachments."""
         if not self.alive:
             await self._start()
         self.busy = True
-        await self._send({"type": "user", "message": {"role": "user", "content": text}})
+        await self._send({"type": "user", "message": {"role": "user", "content": content}})
 
     async def respond_permission(self, request_id: str, allow: bool, message: str = "") -> None:
         if allow:
