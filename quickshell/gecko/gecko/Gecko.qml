@@ -84,7 +84,38 @@ Singleton {
 
     // --- events ----------------------------------------------------------------
 
+    // Across all chats, for the mascot: which chats are working, which wait for approval
+    property var busyChats: ({})
+    property var pendingRequests: ({}) // request_id -> chat id
+    property bool watcherRunning: false
+    readonly property bool anyBusy: Object.keys(busyChats).length > 0
+    readonly property int pendingCount: Object.keys(pendingRequests).length
+
+    function trackGlobal(ev) {
+        const busy = Object.assign({}, root.busyChats);
+        const pending = Object.assign({}, root.pendingRequests);
+        switch (ev.event) {
+        case "user_message": busy[ev.chat] = true; break;
+        case "turn_end": case "closed": delete busy[ev.chat]; break;
+        case "permission_request": pending[ev.request_id] = ev.chat; break;
+        case "permission_resolved": delete pending[ev.request_id]; break;
+        case "watcher_running": root.watcherRunning = ev.on; return;
+        default: return;
+        }
+        root.busyChats = busy;
+        root.pendingRequests = pending;
+    }
+
+    // Open the panel on the chat that's waiting for an approval, if any
+    function showAttention() {
+        const chats = Object.values(root.pendingRequests);
+        if (chats.length && chats[0] !== root.chatId) root.openChat(chats[0]);
+        root.page = "chat";
+        root.open = true;
+    }
+
     function handleEvent(ev) {
+        root.trackGlobal(ev);
         switch (ev.event) {
         case "chat_created":
             if (ev.nonce && ev.nonce === root.pendingNonce) {
