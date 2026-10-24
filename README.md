@@ -18,9 +18,12 @@ still open end-4's).
 
 - Streaming replies with markdown, collapsible tool cards, "thinking" blocks
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**
-- Model picker per chat; the star sets the default for new chats (Sonnet out of the box)
+- Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
+- **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
+- **Hand-off**: copy a chat, or a short model-written brief, to paste into Claude.ai
+  (panel menu, `gecko handoff [--brief]`, or just ask Gecko to hand it off)
 - Chat history, capability switches, kill switch, 5-hour / 7-day usage bars
-- Ctrl+N new chat, Ctrl+H history, Ctrl+O wider panel, Esc closes
+- Ctrl+N new chat, Ctrl+H history, Ctrl+T next theme, Ctrl+O wider panel, Esc closes
 - `qs -c gecko ipc call gecko ask "..."` sends a prompt from a script or keybind
 
 ## How it fits together
