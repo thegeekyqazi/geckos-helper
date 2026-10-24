@@ -16,6 +16,7 @@ from typing import Any
 
 from . import activity, config, context, handoff_export, memory, paths, rules, theme, watchers
 from .backends.claude import ClaudeBackend
+from .desktop import goals
 from .store import Store
 
 log = logging.getLogger("gecko")
@@ -254,6 +255,12 @@ class Daemon:
             w = next(w for w in watchers.load() if w["id"] == req["run"])
             asyncio.create_task(self.run_watcher(w))
         return {"watchers": [watchers.describe(w) for w in watchers.load()]}
+
+    async def op_goals(self, req: dict) -> dict:
+        try:
+            return {"goals": await asyncio.to_thread(goals.list_goals)}
+        except FileNotFoundError:  # no vault configured
+            return {"goals": []}
 
     async def op_rules(self, req: dict) -> dict:
         """No args: list. match+action: add. remove=<index>: delete."""
