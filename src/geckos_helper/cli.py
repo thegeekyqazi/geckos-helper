@@ -61,6 +61,8 @@ async def run_turn(client: Client, text: str, chat: str | None, auto: str | None
             print(f"{DIM}  ✗ {ev['output'][:200]}{END}")
         elif kind == "permission_request":
             print(f"{YEL}? Allow: {ev['title']}{END}")
+            if ev.get("warning"):
+                print(f"{RED}  ⚠ {ev['warning']}{END}")
             print(f"{DIM}  {json.dumps(ev['input'])[:300]}{END}")
             if auto:
                 allow = auto == "yes"
@@ -71,6 +73,8 @@ async def run_turn(client: Client, text: str, chat: str | None, auto: str | None
             await client.call("permission", request_id=ev["request_id"], allow=allow)
         elif kind == "usage":
             pass
+        elif kind == "guard_alert":
+            print(f"{RED}⚠ Possible prompt injection in {ev['source']}: {', '.join(ev['reasons'])}{END}")
         elif kind == "error":
             print(f"{RED}{ev['message']}{END}")
         elif kind == "turn_end":
