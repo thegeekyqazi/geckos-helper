@@ -119,13 +119,35 @@ url = "https://outlook.office365.com/owa/calendar/.../calendar.ics"
 - [x] Context file generator + daily timer
 - [x] Quickshell panel on Super+A with tool cards, approve/deny, history, model picker, usage meter
 - [x] end-4 to-do widget picks up agent edits (small re-appliable patch)
-- [ ] Scheduler: cron-style and event-triggered background tasks, activity inbox, usage budget
-- [ ] Injection classifier for untrusted content
-- [ ] Writable calendar: local store synced both ways (vdirsyncer) with Google + Outlook (DavMail) + a richer calendar widget
+- [x] Chat-app redesign, Lua themes with live reload, theme switcher, context hand-off
+- [ ] "Always allow" permission rules, editable in settings
+- [ ] Activity page: audit trail of everything Gecko did and what's scheduled
+- [ ] Memory: Claude Code's own memory, viewable/editable in the panel, plus search across past chats
+- [ ] Watchers: read-only background checks that notify you ("tell me if it'll rain before class")
+- [ ] Goals: turn a goal into a tracked plan in Obsidian with progress and next steps
+- [ ] Desktop mascot showing idle / working / needs-approval
+- [ ] Writable calendar: Google Calendar (read/write) behind a provider layer (DavMail later if Laurier ICT allows) + calendar widget
+- [ ] Safety: injection classifier, read-only profile for unattended runs
+- [ ] Scheduler recipes, event triggers, activity inbox, usage budget, daily briefing
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
 - [ ] Desktop context buttons (clipboard, focused window, screenshot region), quick-ask keybind
 - [ ] Codex and OpenCode backends (ACP)
-- [ ] Voice input (whisper.cpp)
+
+## Future ideas
+
+Collected from similar projects (Meta Muse, Hermes Agent, OpenClaw, Goose, Mofakir,
+Newelle, Raycast). Not scheduled yet.
+
+- **Approvals from your phone**: approval requests and results sent through ntfy or Telegram, so background work doesn't wait for you to be at the laptop
+- **Self-written skills**: a "save as recipe" button that turns a task that went well into a reusable skill
+- **Credential vault**: logins kept in the system keyring, usable by tools but never readable by the agent
+- **Cheap-model routing**: simple questions go to Haiku and harder ones to Sonnet automatically
+- **Push-to-talk voice**: local speech-to-text (whisper.cpp) and optional spoken replies
+- **Text-selection actions**: select text anywhere, press a key: explain, translate, summarize, make a to-do
+- **Study mode**: quizzes and flashcards generated from Obsidian course notes before a test
+- **D2L / Brightspace sync**: assignments and deadlines from the D2L scraper into the calendar and to-dos
+- **Projects**: chats grouped per course or project, each with its own instructions and files
+- **Focus mode**: during class (from the calendar), hold non-urgent notifications and summarize them afterwards
 
 ## License
 
