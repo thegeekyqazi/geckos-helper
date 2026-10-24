@@ -14,9 +14,8 @@ def _load() -> list[dict]:
 
 def _save(items: list[dict]) -> None:
     paths.END4_TODO.parent.mkdir(parents=True, exist_ok=True)
-    tmp = paths.END4_TODO.with_suffix(".tmp")
-    tmp.write_text(json.dumps(items))
-    tmp.replace(paths.END4_TODO)  # end-4's widget reloads it via the end4.py patch
+    # Written in place, not via rename: the to-do widgets' file watchers follow the inode
+    paths.END4_TODO.write_text(json.dumps(items))
 
 
 def list_items(include_done: bool = False) -> list[dict]:
