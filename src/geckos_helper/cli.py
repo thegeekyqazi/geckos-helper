@@ -127,6 +127,8 @@ def main() -> None:
     m.add_argument("name", nargs="?")
     m.add_argument("--default", action="store_true", help="make it the default for new chats")
     m.add_argument("--chat", help="switch this chat to the model")
+    th = sub.add_parser("theme", help="show, switch (name) or cycle (next/prev) panel themes")
+    th.add_argument("name", nargs="?")
     ep = sub.add_parser("end4-patch", help="(re)apply the end-4 add-ons and keybinds after an end-4 update")
     ep.add_argument("--revert", action="store_true", help="remove them")
     cp = sub.add_parser("caps", help="list or toggle capabilities")
@@ -166,6 +168,16 @@ def main() -> None:
                     config.set_default_model(args.name)
                 print(f"default: {config.default_model()}  available: "
                       + ", ".join(config.load_config()["agents"]["claude"]["models"]))
+            case "theme":
+                from . import theme
+                if args.name in ("next", "prev"):
+                    theme.cycle(1 if args.name == "next" else -1)
+                elif args.name:
+                    theme.set_current(args.name)
+                out = theme.render()  # the daemon also picks the change up within 2s
+                print(f"theme: {out['name']}  available: {', '.join(out['themes'])}")
+                if out["error"]:
+                    print(f"error: {out['error']}")
             case "end4-patch":
                 from . import end4
                 if args.revert:

@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from . import config, context, paths
+from . import config, context, paths, theme
 from .backends.claude import ClaudeBackend
 from .store import Store
 
@@ -201,6 +201,15 @@ class Daemon:
         await self.broadcast({"event": "capability", "name": req["name"], "on": bool(req["on"])})
         return {}
 
+    async def op_theme(self, req: dict) -> dict:
+        """No args: current theme. name=...: switch to it. step=1/-1: cycle saved themes."""
+        if req.get("name"):
+            theme.set_current(req["name"])
+        elif req.get("step"):
+            theme.cycle(int(req["step"]))
+        out = await asyncio.to_thread(theme.render)
+        return {"name": out["name"], "themes": out["themes"], "error": out["error"]}
+
     async def op_context(self, req: dict) -> dict:
         text = await asyncio.to_thread(context.generate)
         return {"context": text}
@@ -227,6 +236,21 @@ class Daemon:
             self.clients.discard(writer)
             writer.close()
 
+    async def watch_theme(self) -> None:
+        """Re-render when the theme file, the default theme or end-4's palette changes."""
+        last = None
+        while True:
+            try:
+                sig = theme.signature()
+                if sig != last:
+                    last = sig
+                    out = await asyncio.to_thread(theme.render)
+                    if out["error"]:
+                        log.warning("theme: %s", out["error"])
+            except Exception:
+                log.exception("theme watcher")
+            await asyncio.sleep(1.5)
+
     async def reap_idle(self) -> None:
         while True:
             await asyncio.sleep(60)
@@ -246,6 +270,7 @@ class Daemon:
         os.chmod(paths.SOCKET, 0o600)
         log.info("listening on %s", paths.SOCKET)
         asyncio.create_task(self.reap_idle())
+        asyncio.create_task(self.watch_theme())
         async with server:
             await server.serve_forever()
 
