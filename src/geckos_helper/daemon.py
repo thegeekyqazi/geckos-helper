@@ -16,7 +16,7 @@ from datetime import date
 from typing import Any
 
 from . import (activity, budget, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
-               watchers)
+               triggers, watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, goals
 from .store import Store
@@ -75,6 +75,7 @@ class Daemon:
         self.usage: dict[str, Any] = {}
         self.watcher_lock = asyncio.Lock()
         self.budget_logged = 0.0
+        self.triggers = triggers.Triggers()
 
     # --- events ----------------------------------------------------------
 
@@ -451,6 +452,9 @@ class Daemon:
                 for r in recipes.due():
                     recipes._mark_run(r["id"])
                     asyncio.create_task(self.run_recipe(r))
+                for r, why in await asyncio.to_thread(self.triggers.poll):
+                    activity.log("trigger", recipe=r["id"], why=why[:200])
+                    asyncio.create_task(self.run_recipe(r, why))
             except Exception:
                 log.exception("scheduler")
 
