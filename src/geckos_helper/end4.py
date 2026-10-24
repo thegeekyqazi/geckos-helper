@@ -40,8 +40,8 @@ BIND_BEGIN = "-- >>> geckos-helper (managed by install.sh; edit outside this blo
 BIND_END = "-- <<< geckos-helper"
 BIND_BLOCK = f"""{BIND_BEGIN}
 hl.unbind("SUPER + A")
-hl.bind("SUPER + A", hl.dsp.exec_cmd("qs -c gecko ipc call gecko toggle"), {{ description = "Gecko's Helper: toggle panel" }})
-hl.bind("SUPER + ALT + K", hl.dsp.exec_cmd("~/.local/bin/gecko kill toggle"), {{ description = "Gecko's Helper: kill switch" }})
+hl.bind("SUPER + A", hl.dsp.exec_cmd("qs -c gecko ipc call gecko toggle"), {{ description = "Gecko: Toggle assistant panel" }})
+hl.bind("SUPER + ALT + K", hl.dsp.exec_cmd("~/.local/bin/gecko kill toggle"), {{ description = "Gecko: Kill switch (stop agents, block desktop access)" }})
 {BIND_END}
 """
 
