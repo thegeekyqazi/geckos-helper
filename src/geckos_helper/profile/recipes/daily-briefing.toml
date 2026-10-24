@@ -10,6 +10,6 @@ prompt = """Write my morning briefing for today. Sections (skip any that are emp
 2. **Due soon**: anything due in the next 3 days from my calendars, Obsidian tasks
    (obsidian_open_tasks) and my to-do list.
 3. **Weather**: today's weather, especially rain and temperature when I'm likely out.
-4. **Goals**: the next step for each active goal (goal_list).
+4. **Projects**: the next step for each active project or goal (project_next_actions).
 5. **Suggestion**: one concrete thing to focus on today.
 Keep it short and scannable."""

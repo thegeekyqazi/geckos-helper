@@ -5,7 +5,7 @@ model = "sonnet"
 output = "inbox"
 enabled = false
 prompt = """Write my weekly review:
-1. **Done this week**: completed Obsidian tasks and goal progress from the last 7 days.
+1. **Done this week**: completed Obsidian tasks and project/goal progress from the last 7 days (project_list).
 2. **Still open**: overdue or slipping items.
 3. **Next week**: the main events and deadlines from my calendars.
-4. **Priorities**: three suggested priorities for the week, tied to my goals."""
+4. **Priorities**: three suggested priorities for the week, tied to my projects and goals."""
