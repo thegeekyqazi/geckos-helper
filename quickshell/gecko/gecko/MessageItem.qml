@@ -315,8 +315,14 @@ Item {
                         onClicked: Gecko.answerPermission(root.index, true, "once")
                     }
                     PermissionButton {
-                        label: "Allow for chat"
+                        label: "This chat"
                         onClicked: Gecko.answerPermission(root.index, true, "chat")
+                        StyledToolTip { text: "Allow this kind of call for the rest of this chat" }
+                    }
+                    PermissionButton {
+                        label: "Always"
+                        onClicked: Gecko.answerPermission(root.index, true, "always")
+                        StyledToolTip { text: "Save a rule that always allows this exact call (edit in Settings)" }
                     }
                     Item { Layout.fillWidth: true }
                     PermissionButton {
