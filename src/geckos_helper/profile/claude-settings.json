@@ -13,7 +13,8 @@
       "mcp__gecko__chat_search",
       "mcp__gecko__weather",
       "mcp__gecko__watch_list",
-      "mcp__gecko__goal_list"
+      "mcp__gecko__goal_list",
+      "mcp__gecko__calendar_list"
     ]
   }
 }
