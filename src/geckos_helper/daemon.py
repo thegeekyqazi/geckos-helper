@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from . import config, context, paths, theme
+from . import config, context, handoff_export, paths, theme
 from .backends.claude import ClaudeBackend
 from .store import Store
 
@@ -209,6 +209,15 @@ class Daemon:
             theme.cycle(int(req["step"]))
         out = await asyncio.to_thread(theme.render)
         return {"name": out["name"], "themes": out["themes"], "error": out["error"]}
+
+    async def op_export(self, req: dict) -> dict:
+        """Copy a chat to the clipboard to continue elsewhere. mode: transcript | brief."""
+        if req.get("mode") == "brief":
+            text = await handoff_export.brief(self.store, req["chat"])
+        else:
+            text = handoff_export.transcript(self.store, req["chat"])
+        await asyncio.to_thread(handoff_export.to_clipboard, text)
+        return {"chars": len(text)}
 
     async def op_context(self, req: dict) -> dict:
         text = await asyncio.to_thread(context.generate)

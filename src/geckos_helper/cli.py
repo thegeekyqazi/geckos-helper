@@ -127,6 +127,9 @@ def main() -> None:
     m.add_argument("name", nargs="?")
     m.add_argument("--default", action="store_true", help="make it the default for new chats")
     m.add_argument("--chat", help="switch this chat to the model")
+    hx = sub.add_parser("handoff", help="copy a chat to the clipboard to continue elsewhere")
+    hx.add_argument("chat", nargs="?", help="chat id (default: most recent)")
+    hx.add_argument("--brief", action="store_true", help="have a small model write a hand-off brief")
     th = sub.add_parser("theme", help="show, switch (name) or cycle (next/prev) panel themes")
     th.add_argument("name", nargs="?")
     ep = sub.add_parser("end4-patch", help="(re)apply the end-4 add-ons and keybinds after an end-4 update")
@@ -168,6 +171,14 @@ def main() -> None:
                     config.set_default_model(args.name)
                 print(f"default: {config.default_model()}  available: "
                       + ", ".join(config.load_config()["agents"]["claude"]["models"]))
+            case "handoff":
+                async def handoff():
+                    client = Client()
+                    await client.connect()
+                    chat = args.chat or (await client.call("chats", limit=1))["chats"][0]["id"]
+                    r = await client.call("export", chat=chat, mode="brief" if args.brief else "transcript")
+                    print(f"copied {r['chars']} characters; paste into Claude.ai or anywhere")
+                asyncio.run(handoff())
             case "theme":
                 from . import theme
                 if args.name in ("next", "prev"):
