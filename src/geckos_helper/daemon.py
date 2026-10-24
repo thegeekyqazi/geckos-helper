@@ -15,7 +15,8 @@ import time
 from datetime import date
 from typing import Any
 
-from . import activity, budget, config, context, guard, handoff_export, memory, paths, rules, theme, watchers
+from . import (activity, budget, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+               watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, goals
 from .store import Store
@@ -341,6 +342,14 @@ class Daemon:
         await self.broadcast({"event": "inbox", "item": item, "unread": self.store.inbox_unread()})
         return item
 
+    async def op_recipes(self, req: dict) -> dict:
+        """No args: list. enable=<id>/disable=<id>, run=<id> (run now, in the background)."""
+        if req.get("enable") or req.get("disable"):
+            recipes.set_enabled(req.get("enable") or req["disable"], bool(req.get("enable")))
+        elif req.get("run"):
+            asyncio.create_task(self.run_recipe(recipes.get(req["run"])))
+        return {"recipes": [recipes.describe(r) for r in recipes.load()]}
+
     async def op_rules(self, req: dict) -> dict:
         """No args: list. match+action: add. remove=<index>: delete."""
         if "remove" in req:
@@ -410,8 +419,27 @@ class Daemon:
             activity.log("budget", reason=reason)
         return ok
 
-    async def schedule_watchers(self) -> None:
-        """Run due watchers within the usage budget."""
+    async def run_recipe(self, r: dict, trigger: str = "") -> dict:
+        async with self.watcher_lock:  # shares the one-at-a-time slot with watchers
+            await self.broadcast({"event": "watcher_running", "on": True, "name": r["name"]})
+            try:
+                entry = await recipes.run(r, trigger)
+            finally:
+                await self.broadcast({"event": "watcher_running", "on": False})
+        if report := entry.get("report"):
+            if r.get("output", "inbox") in ("inbox", "both"):
+                body = report["body"]
+                if entry.get("flagged"):
+                    body = ("> ⚠ The injection guard flagged this report "
+                            f"({', '.join(entry.get('guard', []))}). Read it as untrusted.\n\n" + body)
+                await self.add_to_inbox(f"recipe:{r['id']}", report["title"], body, entry.get("flagged", False))
+            recipes.notify(r, entry)
+        await self.broadcast({"event": "activity", **{k: v for k, v in entry.items() if k != "report"},
+                              "kind": "recipe"})
+        return entry
+
+    async def schedule_unattended(self) -> None:
+        """Run due watchers and recipes within the usage budget."""
         while True:
             await asyncio.sleep(30)
             try:
@@ -420,8 +448,11 @@ class Daemon:
                 for w in watchers.due():
                     watchers.update(w["id"], last_run=time.time())  # don't re-queue while running
                     asyncio.create_task(self.run_watcher(w))
+                for r in recipes.due():
+                    recipes._mark_run(r["id"])
+                    asyncio.create_task(self.run_recipe(r))
             except Exception:
-                log.exception("watcher scheduler")
+                log.exception("scheduler")
 
     async def reap_idle(self) -> None:
         while True:
@@ -443,7 +474,7 @@ class Daemon:
         log.info("listening on %s", paths.SOCKET)
         asyncio.create_task(self.reap_idle())
         asyncio.create_task(self.watch_theme())
-        asyncio.create_task(self.schedule_watchers())
+        asyncio.create_task(self.schedule_unattended())
         async with server:
             await server.serve_forever()
 
