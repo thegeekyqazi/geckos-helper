@@ -71,6 +71,12 @@ Rectangle {
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.margins: 4 }
         MenuItem {
+            iconName: "timeline"
+            label: "Activity"
+            hint: "What Gecko did, watchers, goals"
+            onClicked: { Gecko.page = "activity"; root.shown = false; }
+        }
+        MenuItem {
             iconName: "tune"
             label: "Settings"
             hint: "What Gecko can access"

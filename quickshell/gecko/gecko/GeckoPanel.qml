@@ -109,11 +109,12 @@ PanelWindow {
             StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: ["chat", "history", "settings"].indexOf(Gecko.page)
+                currentIndex: ["chat", "history", "settings", "activity"].indexOf(Gecko.page)
 
                 ChatPage { id: chatPage }
                 HistoryPage {}
                 SettingsPage {}
+                ActivityPage {}
             }
         }
 
@@ -152,6 +153,7 @@ PanelWindow {
                     text: !Gecko.connected ? "Gecko is offline"
                         : Gecko.page === "history" ? "Chats"
                         : Gecko.page === "settings" ? "Settings"
+                        : Gecko.page === "activity" ? "Activity"
                         : (Gecko.chatTitle || "New chat")
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight

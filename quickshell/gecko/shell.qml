@@ -27,6 +27,7 @@ ShellRoot {
         function newChat(): void { Gecko.newChat(); Gecko.open = true }
         function history(): void { Gecko.refreshChats(); Gecko.page = "history"; Gecko.open = true }
         function settings(): void { Gecko.page = "settings"; Gecko.open = true }
+        function activity(): void { Gecko.page = "activity"; Gecko.open = true }
         function ask(text: string): void {
             Gecko.newChat();
             Gecko.open = true;
