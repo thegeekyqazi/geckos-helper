@@ -109,13 +109,14 @@ PanelWindow {
             StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: ["chat", "history", "settings", "activity", "memory"].indexOf(Gecko.page)
+                currentIndex: ["chat", "history", "settings", "activity", "memory", "calendar"].indexOf(Gecko.page)
 
                 ChatPage { id: chatPage }
                 HistoryPage {}
                 SettingsPage {}
                 ActivityPage {}
                 MemoryPage {}
+                CalendarPage {}
             }
         }
 
@@ -156,6 +157,7 @@ PanelWindow {
                         : Gecko.page === "settings" ? "Settings"
                         : Gecko.page === "activity" ? "Activity"
                         : Gecko.page === "memory" ? "Memory"
+                        : Gecko.page === "calendar" ? "Calendar"
                         : (Gecko.chatTitle || "New chat")
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -174,6 +176,11 @@ PanelWindow {
             text: "front_hand"
             color: Theme.errorText
             iconSize: 20
+        }
+        IconButton {
+            iconName: "calendar_month"
+            tip: "Calendar"
+            onClicked: Gecko.page = Gecko.page === "calendar" ? "chat" : "calendar"
         }
         IconButton {
             iconName: "palette"
