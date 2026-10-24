@@ -42,6 +42,7 @@ CAPABILITIES: dict[str, str] = {
     "system_info": "Battery, focused window, workspaces, memory, disk",
     "media_control": "See and control the media player",
     "clipboard_read": "Read the current clipboard",
+    "clipboard_write": "Copy text to the clipboard (e.g. a hand-off brief)",
     "obsidian_read": "Search and read your Obsidian vault",
     "obsidian_write": "Create notes and append ideas in the vault",
     "calendar_read": "Read events from your calendar feeds",

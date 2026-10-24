@@ -12,7 +12,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import paths
+from . import handoff_export, paths
 from .config import load_state
 from .desktop import calendar, obsidian, system, todo, untrusted
 from .handoff import open_claude_code
@@ -133,6 +133,14 @@ def media_control(action: str) -> dict:
 def clipboard_read() -> str:
     """The current clipboard text (untrusted)."""
     return untrusted("clipboard", system.clipboard())
+
+
+@server.tool()
+@gated("clipboard_write", writes=True)
+def clipboard_write(text: str) -> str:
+    """Copy text to the user's clipboard."""
+    handoff_export.to_clipboard(text)
+    return f"copied {len(text)} characters"
 
 
 # --- calendar ---------------------------------------------------------------
