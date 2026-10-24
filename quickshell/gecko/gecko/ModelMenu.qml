@@ -4,20 +4,20 @@ import qs.modules.common
 import qs.modules.common.widgets
 
 /**
- * Model picker. Click a model to use it for this chat; the star makes it the
- * default for new chats.
+ * Model picker above the composer. Click a model to use it for this chat; the star
+ * makes it the default for new chats.
  */
 Rectangle {
     id: root
     property bool shown: false
     visible: shown
     z: 10
-    implicitWidth: 220
+    implicitWidth: 230
     implicitHeight: column.implicitHeight + 12
-    radius: Appearance.rounding.normal
-    color: Appearance.colors.colSurfaceContainerHigh
+    radius: Theme.cardRadius
+    color: Theme.surfaceHigh
     border.width: 1
-    border.color: Appearance.colors.colOutlineVariant
+    border.color: Theme.border
 
     ColumnLayout {
         id: column
@@ -25,11 +25,11 @@ Rectangle {
         anchors.margins: 6
         spacing: 2
 
-        StyledText {
+        GText {
             Layout.margins: 6
             text: "Model"
-            font.pixelSize: Appearance.font.pixelSize.smaller
-            color: Appearance.colors.colSubtext
+            muted: true
+            rel: 0.75
         }
 
         Repeater {
@@ -37,12 +37,13 @@ Rectangle {
             delegate: RippleButton {
                 id: row
                 required property string modelData
+                readonly property bool current: (Gecko.chatModel || Gecko.defaultModel) === modelData
                 Layout.fillWidth: true
-                implicitHeight: 36
-                buttonRadius: Appearance.rounding.small
-                toggled: (Gecko.chatModel || Gecko.defaultModel) === modelData
-                colBackgroundToggled: Appearance.colors.colSecondaryContainer
-                colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
+                implicitHeight: 38
+                buttonRadius: Theme.cardRadius - 4
+                colBackground: "transparent"
+                colBackgroundHover: Theme.surface
+                colRipple: Theme.border
                 onClicked: {
                     Gecko.setModel(modelData);
                     root.shown = false;
@@ -51,24 +52,25 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 4
-                    StyledText {
+                    spacing: 6
+                    GText {
                         Layout.fillWidth: true
-                        text: row.modelData
-                        color: row.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                        text: row.modelData.replace(/^./, c => c.toUpperCase())
+                        rel: 0.93
+                        wrapMode: Text.NoWrap
                     }
-                    RippleButton {
-                        implicitWidth: 28
-                        implicitHeight: 28
-                        buttonRadius: Appearance.rounding.full
+                    MaterialSymbol {
+                        visible: row.current
+                        text: "check"
+                        color: Theme.accent
+                        iconSize: 18
+                    }
+                    IconButton {
+                        size: 28
+                        iconName: "star"
+                        iconColor: Gecko.defaultModel === row.modelData ? Theme.accent : Theme.textMuted
+                        tip: Gecko.defaultModel === row.modelData ? "Default for new chats" : "Make default for new chats"
                         onClicked: Gecko.setDefaultModel(row.modelData)
-                        contentItem: MaterialSymbol {
-                            anchors.centerIn: parent
-                            horizontalAlignment: Text.AlignHCenter
-                            text: "star"
-                            fill: Gecko.defaultModel === row.modelData ? 1 : 0
-                            color: Gecko.defaultModel === row.modelData ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
-                        }
-                        StyledToolTip { text: "Make default for new chats" }
                     }
                 }
             }
