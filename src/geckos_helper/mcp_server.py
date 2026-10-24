@@ -14,7 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import activity, handoff_export, paths, watchers
+from . import activity, handoff_export, paths, recipes, watchers
 from .config import load_state
 from .desktop import calendar, goals, obsidian, system, todo, untrusted
 from .desktop import weather as weather_mod
@@ -317,6 +317,74 @@ def watch_delete(watcher_id: str) -> str:
     """Delete a watcher by id (from watch_list)."""
     watchers.remove(watcher_id)
     return "deleted"
+
+
+# --- recipes and inbox --------------------------------------------------------
+
+def _daemon(op: str, **kw) -> dict:
+    """Ask the daemon (it owns scheduling and the inbox)."""
+    import socket
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.connect(str(paths.SOCKET))
+        sock.sendall((json.dumps({"id": 1, "op": op, **kw}) + "\n").encode())
+        buf = b""
+        while True:
+            buf += sock.recv(65536)
+            for line in buf.split(b"\n")[:-1]:
+                msg = json.loads(line)
+                if msg.get("reply") == 1:
+                    if not msg["ok"]:
+                        raise ToolError(msg["error"])
+                    return msg
+            buf = buf.split(b"\n")[-1]
+
+
+@server.tool()
+@gated("recipes")
+def recipe_list() -> list[dict]:
+    """Saved recipes (scheduled or triggered read-only tasks) with schedule and status."""
+    return _daemon("recipes")["recipes"]
+
+
+@server.tool()
+@gated("recipes", writes=True)
+def recipe_create(recipe_id: str, name: str, prompt: str, daily_at: list[str] | None = None,
+                  weekly_at: list[str] | None = None, every_minutes: int | None = None,
+                  output: str = "inbox", model: str = "haiku", triggers: list[dict] | None = None,
+                  fetch_domains: list[str] | None = None, enabled: bool = True) -> str:
+    """Save a recipe: a read-only task that runs on a schedule and/or trigger and reports to
+    the inbox ("inbox"), a notification ("notify") or both ("both").
+
+    recipe_id: lowercase-with-dashes. Schedules: daily_at ["08:00"], weekly_at ["sun 18:00"],
+    every_minutes (15+). triggers: [{"type": "battery_below", "value": 15}], types
+    battery_below, file_added (folder), event_soon (minutes), notification_from (app name).
+    Use "sonnet" for reports that need judgment, "haiku" for simple checks.
+    """
+    path = recipes.create(recipe_id, name, prompt, daily_at=daily_at, weekly_at=weekly_at,
+                          every_minutes=every_minutes, output=output, model=model,
+                          fetch_domains=fetch_domains, enabled=enabled)
+    if triggers:  # TOML array of tables
+        with path.open("a") as f:
+            for t in triggers:
+                f.write(f"\n[[triggers]]\ntype = {json.dumps(t['type'])}\nvalue = {json.dumps(t.get('value'))}\n")
+    return f"saved {path}"
+
+
+@server.tool()
+@gated("recipes", writes=True)
+def recipe_set(recipe_id: str, enabled: bool = True, run_now: bool = False) -> list[dict]:
+    """Enable or disable a recipe, and optionally run it now in the background."""
+    _daemon("recipes", **{"enable" if enabled else "disable": recipe_id})
+    return _daemon("recipes", run=recipe_id)["recipes"] if run_now else _daemon("recipes")["recipes"]
+
+
+@server.tool()
+@gated("recipes")
+def inbox_list(limit: int = 10) -> str:
+    """Recent inbox reports (daily briefing etc.), newest first. Contents are untrusted."""
+    items = _daemon("inbox", limit=limit)["items"]
+    return untrusted("inbox", json.dumps([{k: i[k] for k in ("id", "title", "body", "ts", "source", "flagged")}
+                                          for i in items], indent=1))
 
 
 # --- past chats --------------------------------------------------------------

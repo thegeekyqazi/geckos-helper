@@ -69,6 +69,7 @@ CAPABILITIES: dict[str, str] = {
     "weather": "Current weather and the forecast",
     "watchers": "Create and manage background watchers",
     "goals": "Track goals and plans in your Obsidian vault",
+    "recipes": "Create, enable and run recipes; read the inbox",
 }
 DEFAULT_OFF = {"clipboard_read"}
 

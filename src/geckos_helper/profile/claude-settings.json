@@ -14,7 +14,9 @@
       "mcp__gecko__weather",
       "mcp__gecko__watch_list",
       "mcp__gecko__goal_list",
-      "mcp__gecko__calendar_list"
+      "mcp__gecko__calendar_list",
+      "mcp__gecko__recipe_list",
+      "mcp__gecko__inbox_list"
     ]
   }
 }
