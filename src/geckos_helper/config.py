@@ -25,6 +25,7 @@ idle_timeout_minutes = 15  # stop an idle agent process (the chat can be resumed
 terminal = "kitty"
 obsidian_vault = "~/stuff/Obsidian/Vault 0"
 obsidian_inbox = "Gecko/Inbox.md"   # where captured ideas go, relative to the vault
+weather_city = ""                   # empty = located from your IP, like end-4's bar
 
 # Read-only calendar feeds (.ics). For Outlook: Settings > Calendar >
 # Shared calendars > Publish a calendar > copy the ICS link.
@@ -48,6 +49,7 @@ CAPABILITIES: dict[str, str] = {
     "calendar_read": "Read events from your calendar feeds",
     "handoff": "Open a full Claude Code session in a terminal",
     "chat_search": "Search your past Gecko chats",
+    "weather": "Current weather and the forecast",
 }
 DEFAULT_OFF = {"clipboard_read"}
 

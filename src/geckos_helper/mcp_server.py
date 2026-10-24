@@ -15,6 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from . import handoff_export, paths
 from .config import load_state
 from .desktop import calendar, obsidian, system, todo, untrusted
+from .desktop import weather as weather_mod
 from .handoff import open_claude_code
 
 server = MCPServer(
@@ -141,6 +142,13 @@ def clipboard_write(text: str) -> str:
     """Copy text to the user's clipboard."""
     handoff_export.to_clipboard(text)
     return f"copied {len(text)} characters"
+
+
+@server.tool()
+@gated("weather")
+def weather(days: int = 2) -> dict:
+    """Current weather and a 3-hourly forecast (temperature, chance of rain) for up to 3 days."""
+    return weather_mod.forecast(min(days, 3))
 
 
 # --- calendar ---------------------------------------------------------------
