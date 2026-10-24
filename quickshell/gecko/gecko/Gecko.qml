@@ -316,6 +316,14 @@ Singleton {
         root.call("kill", { on: on });
     }
 
+    property var rules: []
+    function refreshRules() {
+        root.call("rules", {}, r => root.rules = r.rules);
+    }
+    function removeRule(index) {
+        root.call("rules", { remove: index }, r => root.rules = r.rules);
+    }
+
     function setCapability(name, on) {
         root.call("capability", { name: name, on: on });
     }
