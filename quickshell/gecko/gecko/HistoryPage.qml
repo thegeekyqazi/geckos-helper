@@ -6,29 +6,25 @@ import qs.modules.common.widgets
 ColumnLayout {
     spacing: 6
 
-    StyledText {
-        text: "Chats"
-        font.pixelSize: Appearance.font.pixelSize.large
-        color: Appearance.colors.colOnLayer0
-        Layout.leftMargin: 4
-    }
 
     StyledListView {
         id: list
         Layout.fillWidth: true
         Layout.fillHeight: true
+        leftMargin: 8
+        rightMargin: 8
         clip: true
         spacing: 4
         model: Gecko.chats
         delegate: RippleButton {
             id: row
             required property var modelData
-            width: list.width
+            width: list.width - 16
             implicitHeight: 54
-            buttonRadius: Appearance.rounding.small
+            buttonRadius: Theme.cardRadius
             toggled: modelData.id === Gecko.chatId
-            colBackgroundToggled: Appearance.colors.colSecondaryContainer
-            colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
+            colBackgroundToggled: Theme.surfaceHigh
+            colBackgroundToggledHover: Theme.surface
             onClicked: Gecko.openChat(modelData.id)
             contentItem: RowLayout {
                 anchors.fill: parent
@@ -42,13 +38,13 @@ ColumnLayout {
                         Layout.fillWidth: true
                         text: row.modelData.title
                         elide: Text.ElideRight
-                        color: row.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                        color: row.toggled ? Theme.text : Theme.text
                     }
                     StyledText {
                         text: `${new Date(row.modelData.updated * 1000).toLocaleString(Qt.locale(), "MMM d, h:mm ap")}`
                             + ` · ${row.modelData.model ?? ""}` + (row.modelData.busy ? " · working" : "")
                         font.pixelSize: Appearance.font.pixelSize.smallest
-                        color: Appearance.colors.colSubtext
+                        color: Theme.textMuted
                     }
                 }
                 RippleButton {
@@ -60,7 +56,7 @@ ColumnLayout {
                         anchors.centerIn: parent
                         horizontalAlignment: Text.AlignHCenter
                         text: "delete"
-                        color: Appearance.colors.colSubtext
+                        color: Theme.textMuted
                     }
                     StyledToolTip { text: "Delete chat" }
                 }
@@ -72,6 +68,6 @@ ColumnLayout {
         Layout.alignment: Qt.AlignHCenter
         visible: Gecko.chats.length === 0
         text: "No chats yet"
-        color: Appearance.colors.colSubtext
+        color: Theme.textMuted
     }
 }
