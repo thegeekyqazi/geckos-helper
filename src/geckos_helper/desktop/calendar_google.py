@@ -6,6 +6,7 @@ The token is kept in ~/.local/state/geckos-helper/google-token.json (mode 600).
 """
 
 import os
+from urllib.parse import quote
 from datetime import date, datetime
 from typing import Any
 
@@ -58,9 +59,14 @@ def _api(method: str, path: str, **kw: Any) -> Any:
     return r.json() if r.content else None
 
 
+def _cid(calendar_id: str) -> str:
+    return quote(calendar_id, safe="")  # ids like "en.canadian#holiday@group…" contain '#'
+
+
 def calendars() -> list[dict]:
     items = _api("GET", "/users/me/calendarList")["items"]
-    return [{"id": c["id"], "name": c.get("summaryOverride") or c["summary"], "color": c.get("backgroundColor"),
+    return [{"id": c["id"], "color": c.get("backgroundColor"),
+             "name": c.get("summaryOverride") or ("Google" if c.get("primary") else c["summary"]),
              "primary": c.get("primary", False), "writable": c.get("accessRole") in ("owner", "writer")}
             for c in items]
 
@@ -70,7 +76,7 @@ def _when(v: dict) -> str:
 
 
 def events(calendar_id: str, start: datetime, end: datetime) -> list[dict]:
-    data = _api("GET", f"/calendars/{calendar_id}/events", params={
+    data = _api("GET", f"/calendars/{_cid(calendar_id)}/events", params={
         "timeMin": start.astimezone().isoformat(), "timeMax": end.astimezone().isoformat(),
         "singleEvents": "true", "orderBy": "startTime", "maxResults": 250})
     return [{"id": e["id"], "title": e.get("summary", "(no title)"), "start": _when(e["start"]),
@@ -93,7 +99,7 @@ def add(calendar_id: str, title: str, start: str, end: str, location: str = "", 
         body["location"] = location
     if description:
         body["description"] = description
-    e = _api("POST", f"/calendars/{calendar_id}/events", json=body)
+    e = _api("POST", f"/calendars/{_cid(calendar_id)}/events", json=body)
     return {"id": e["id"], "link": e.get("htmlLink")}
 
 
@@ -105,9 +111,9 @@ def update(calendar_id: str, event_id: str, **fields: str) -> dict:
     for key in ("start", "end"):
         if fields.get(key):
             body[key] = _time(fields[key])
-    e = _api("PATCH", f"/calendars/{calendar_id}/events/{event_id}", json=body)
+    e = _api("PATCH", f"/calendars/{_cid(calendar_id)}/events/{event_id}", json=body)
     return {"id": e["id"], "link": e.get("htmlLink")}
 
 
 def delete(calendar_id: str, event_id: str) -> None:
-    _api("DELETE", f"/calendars/{calendar_id}/events/{event_id}")
+    _api("DELETE", f"/calendars/{_cid(calendar_id)}/events/{event_id}")
