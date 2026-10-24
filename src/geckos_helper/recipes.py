@@ -51,7 +51,15 @@ You cannot change anything, only report.
 
 Reply in concise markdown (under 250 words) for a narrow panel. The first line must
 be a short title starting with "# ". If there is genuinely nothing worth reporting,
-reply with exactly: NOTHING"""
+reply with exactly: NOTHING
+
+If the task asks for suggested to-dos, end with a fenced block listing them, one
+short actionable to-do per line (at most 6); the user can add them with one click:
+```gecko-todos
+Email Saqib to book the planning session
+```"""
+
+TODOS_RE = re.compile(r"```gecko-todos\n(.*?)```", re.S)
 
 
 def _state() -> dict[str, dict]:
@@ -169,8 +177,13 @@ async def run(r: dict, trigger: str = "") -> dict:
         if text == "NOTHING" or not text:
             entry["report"] = None
         else:
+            todos = []
+            if m := TODOS_RE.search(text):
+                todos = [t.strip(" -*•\t") for t in m[1].splitlines() if t.strip(" -*•\t")][:6]
+                text = TODOS_RE.sub("", text).strip()
             title, _, body = text.partition("\n")
-            entry["report"] = {"title": title.lstrip("# ").strip() or r["name"], "body": body.strip()}
+            entry["report"] = {"title": title.lstrip("# ").strip() or r["name"], "body": body.strip(),
+                               "todos": todos}
             verdict = await guard.scan(text)
             entry["flagged"] = verdict.suspicious
             if verdict.suspicious:
