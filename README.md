@@ -23,6 +23,13 @@ to show your events.
 
 - Streaming replies with markdown, collapsible tool cards, "thinking" blocks
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**
+- **Attachments** (the **+** button): screenshot a region, the focused window, the clipboard,
+  selected text, or a file. Images go to the model as images; text is marked untrusted.
+- **/ commands** with a palette (↑↓, Tab, Enter): `/todo`, `/note`, `/idea` act instantly
+  without the AI; `/screenshot`, `/window`, `/clipboard`, `/selection`, `/file` attach;
+  `/remember`, `/model`, `/theme`, `/briefing`, `/handoff`, `/copy`, page shortcuts, `/kill`.
+- **Quick ask** on **Super+Space**: a small box in the middle of the screen; Enter starts a
+  chat, and / commands work there too.
 - Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
 - **Inbox** for recipe reports (the daily briefing arrives at 8:00), with an unread badge
@@ -172,7 +179,7 @@ there, Gecko gives you the details to add in Outlook.
 - [x] Safety: injection guard with chat tainting, read-only profile for unattended runs
 - [x] Recipes (TOML) on schedules and event triggers, inbox, usage budget, daily briefing; see [docs/RECIPES.md](docs/RECIPES.md)
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
-- [ ] Desktop context buttons (clipboard, focused window, screenshot region), quick-ask keybind
+- [x] Attachments (screenshot, window, clipboard, selection, file), / commands, quick ask on Super+Space
 - [ ] Codex and OpenCode backends (ACP)
 
 ## Future ideas
