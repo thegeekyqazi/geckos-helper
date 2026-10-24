@@ -150,9 +150,8 @@ def render() -> dict[str, Any]:
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
             out["tokens"] = {}
     paths.ensure_dirs()
-    tmp = OUTPUT.with_suffix(".tmp")
-    tmp.write_text(json.dumps(out, indent=1))
-    tmp.replace(OUTPUT)
+    # Written in place, not via rename: the panel's file watcher follows the inode.
+    OUTPUT.write_text(json.dumps(out, indent=1))
     return out
 
 
