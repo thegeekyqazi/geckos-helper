@@ -95,6 +95,27 @@ def remove_keybinds() -> None:
         KEYBINDS.write_text(_strip_block(KEYBINDS.read_text()))
 
 
+# Layer rules for Gecko's surfaces so see-through themes (glass, blur) get a real blur
+# of what's behind them. Opaque themes look the same either way.
+RULES = paths.HOME / ".config/hypr/custom/rules.lua"
+RULES_BLOCK = f"""{BIND_BEGIN}
+hl.layer_rule({{ match = {{ namespace = "quickshell:gecko.*" }}, blur = true }})
+hl.layer_rule({{ match = {{ namespace = "quickshell:gecko.*" }}, ignore_alpha = 0.15 }})
+hl.layer_rule({{ match = {{ namespace = "quickshell:gecko.*" }}, xray = false }})
+{BIND_END}
+"""
+
+
+def install_rules() -> None:
+    text = RULES.read_text() if RULES.exists() else ""
+    RULES.write_text(_strip_block(text).rstrip("\n") + "\n\n" + RULES_BLOCK)
+
+
+def remove_rules() -> None:
+    if RULES.exists():
+        RULES.write_text(_strip_block(RULES.read_text()))
+
+
 def check() -> list[str]:
     missing = [p.name for p in PATCHES if p.file.exists() and not p.applied()]
     return [f"end-4 add-ons missing ({', '.join(missing)}); run `gecko end4-patch`"] if missing else []

@@ -215,11 +215,13 @@ def main() -> None:
                 if args.revert:
                     end4.revert()
                     end4.remove_keybinds()
+                    end4.remove_rules()
                     print("removed the end-4 add-ons and keybinds")
                 else:
                     applied = end4.apply()
                     end4.install_keybinds()
-                    print("applied: " + ", ".join(applied + ["keybinds"]))
+                    end4.install_rules()
+                    print("applied: " + ", ".join(applied + ["keybinds", "layer rules"]))
             case "caps":
                 if args.name and args.state:
                     try:
