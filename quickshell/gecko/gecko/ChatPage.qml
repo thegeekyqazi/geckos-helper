@@ -251,7 +251,7 @@ Item {
         implicitWidth: 230
         implicitHeight: attachCol.implicitHeight + 12
         radius: Theme.cardRadius
-        color: Theme.surfaceHigh
+        color: Theme.popup
         border.width: 1
         border.color: Theme.border
         ColumnLayout {
@@ -298,7 +298,7 @@ Item {
         anchors.bottomMargin: composer.height + 16
         implicitHeight: Math.min(paletteList.contentHeight + 12, 320)
         radius: Theme.cardRadius
-        color: Theme.surfaceHigh
+        color: Theme.popup
         border.width: 1
         border.color: Theme.border
         ListView {

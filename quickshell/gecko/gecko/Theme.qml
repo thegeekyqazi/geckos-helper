@@ -20,6 +20,8 @@ Singleton {
     readonly property color bg: t.bg ?? Appearance.colors.colLayer0
     readonly property color surface: t.surface ?? Appearance.colors.colLayer1
     readonly property color surfaceHigh: t.surface_high ?? Appearance.colors.colLayer2
+    // Menus and palettes float over other content, so they stay readable even in glass themes
+    readonly property color popup: t.popup ?? surfaceHigh
     readonly property color border: t.border ?? Appearance.colors.colLayer0Border
     readonly property color text: t.text ?? Appearance.colors.colOnLayer0
     readonly property color textMuted: t.text_muted ?? Appearance.colors.colSubtext

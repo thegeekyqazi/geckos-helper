@@ -15,7 +15,7 @@ Rectangle {
     implicitWidth: 250
     implicitHeight: column.implicitHeight + 12
     radius: Theme.cardRadius
-    color: Theme.surfaceHigh
+    color: Theme.popup
     border.width: 1
     border.color: Theme.border
 

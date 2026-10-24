@@ -115,7 +115,7 @@ PanelWindow {
         width: box.width
         implicitHeight: visible ? Math.min(list.contentHeight + 12, 300) : 0
         radius: Theme.cardRadius
-        color: Theme.surfaceHigh
+        color: Theme.popup
         border.width: 1
         border.color: Theme.border
         ListView {
