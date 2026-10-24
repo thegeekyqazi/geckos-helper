@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from . import config, context, handoff_export, paths, theme
+from . import activity, config, context, handoff_export, paths, rules, theme
 from .backends.claude import ClaudeBackend
 from .store import Store
 
@@ -50,7 +50,7 @@ class Daemon:
         self.chat_allows: dict[str, set[str]] = {}
         # Calls the user denied this turn: an identical retry is denied without asking again
         self.turn_denials: dict[str, set[str]] = {}
-        self.request_keys: dict[str, str] = {}  # request_id -> exact call key
+        self.request_info: dict[str, dict] = {}  # request_id -> the permission_request
         self.usage: dict[str, Any] = {}
 
     # --- events ----------------------------------------------------------
@@ -69,16 +69,15 @@ class Daemon:
             if kind == "session_ready":
                 self.store.update(chat_id, session_id=data["session_id"])
             elif kind == "permission_request":
-                exact = call_key(data["tool"], data["input"])
-                if exact in self.turn_denials.get(chat_id, ()):
-                    await self.backends[chat_id].respond_permission(
-                        data["request_id"], False, DENIED + " You already asked for this exact action.")
-                    return
-                if rule_key(data["tool"], data["input"]) in self.chat_allows.get(chat_id, ()):
-                    await self.backends[chat_id].respond_permission(data["request_id"], True)
+                if auto := self.auto_decision(chat_id, data):
+                    allow, by = auto
+                    note = " You already asked for this exact action." if by == "repeat" else ""
+                    await self.backends[chat_id].respond_permission(data["request_id"], allow, DENIED + note)
+                    activity.log("permission", decision="allow" if allow else "deny", by=by,
+                                 tool=data["tool"], title=data["title"], chat=chat_id)
                     return
                 self.pending[data["request_id"]] = chat_id
-                self.request_keys[data["request_id"]] = exact
+                self.request_info[data["request_id"]] = data
             elif kind == "user_message":
                 self.turn_denials.pop(chat_id, None)
             elif kind == "usage":
@@ -120,15 +119,31 @@ class Daemon:
         self.store.update(chat["id"])
         return {"chat": chat["id"]}
 
+    def auto_decision(self, chat_id: str, data: dict) -> tuple[bool, str] | None:
+        """(allow, decided_by) when a request needs no prompt; saved rules first."""
+        tool, inp = data["tool"], data["input"]
+        if call_key(tool, inp) in self.turn_denials.get(chat_id, ()):
+            return False, "repeat"
+        if decision := rules.decide(tool, inp):
+            return decision == "allow", "rule"
+        if rule_key(tool, inp) in self.chat_allows.get(chat_id, ()):
+            return True, "chat"
+        return None
+
     async def op_permission(self, req: dict) -> dict:
-        """allow: bool; scope: "once" (default) or "chat" to stop asking for this kind of call."""
+        """allow: bool; scope: "once" (default), "chat" (this chat) or "always" (saved rule)."""
         chat_id = self.pending.pop(req["request_id"])
         backend = self.backends[chat_id]
-        exact = self.request_keys.pop(req["request_id"], None)
-        if not req["allow"] and exact:
-            self.turn_denials.setdefault(chat_id, set()).add(exact)
-        if req["allow"] and req.get("scope") == "chat" and "tool" in req:
-            self.chat_allows.setdefault(chat_id, set()).add(rule_key(req["tool"], req.get("input", {})))
+        info = self.request_info.pop(req["request_id"], {})
+        tool, inp = info.get("tool", ""), info.get("input", {})
+        if not req["allow"] and info:
+            self.turn_denials.setdefault(chat_id, set()).add(call_key(tool, inp))
+        if req["allow"] and req.get("scope") == "chat" and info:
+            self.chat_allows.setdefault(chat_id, set()).add(rule_key(tool, inp))
+        if req.get("scope") == "always" and info:
+            rules.add(rules.exact_pattern(tool, inp), "allow" if req["allow"] else "deny")
+        activity.log("permission", decision="allow" if req["allow"] else "deny",
+                     by=req.get("scope", "once"), tool=tool, title=info.get("title", ""), chat=chat_id)
         message = DENIED + (f" They said: {req['message']}" if req.get("message") else "")
         await backend.respond_permission(req["request_id"], bool(req["allow"]), message)
         await self.broadcast({"event": "permission_resolved", "chat": chat_id,
@@ -218,6 +233,17 @@ class Daemon:
             text = handoff_export.transcript(self.store, req["chat"])
         await asyncio.to_thread(handoff_export.to_clipboard, text)
         return {"chars": len(text)}
+
+    async def op_rules(self, req: dict) -> dict:
+        """No args: list. match+action: add. remove=<index>: delete."""
+        if "remove" in req:
+            rules.remove(int(req["remove"]))
+        elif req.get("match"):
+            rules.add(req["match"], req["action"])
+        return {"rules": rules.load()}
+
+    async def op_activity(self, req: dict) -> dict:
+        return {"entries": activity.recent(req.get("limit", 200))}
 
     async def op_context(self, req: dict) -> dict:
         text = await asyncio.to_thread(context.generate)
