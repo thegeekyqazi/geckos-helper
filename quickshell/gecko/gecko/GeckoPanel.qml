@@ -109,7 +109,7 @@ PanelWindow {
             StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: ["chat", "history", "settings", "activity", "memory", "calendar"].indexOf(Gecko.page)
+                currentIndex: ["chat", "history", "settings", "activity", "memory", "calendar", "inbox"].indexOf(Gecko.page)
 
                 ChatPage { id: chatPage }
                 HistoryPage {}
@@ -117,6 +117,7 @@ PanelWindow {
                 ActivityPage {}
                 MemoryPage {}
                 CalendarPage {}
+                InboxPage {}
             }
         }
 
@@ -158,6 +159,7 @@ PanelWindow {
                         : Gecko.page === "activity" ? "Activity"
                         : Gecko.page === "memory" ? "Memory"
                         : Gecko.page === "calendar" ? "Calendar"
+                        : Gecko.page === "inbox" ? "Inbox"
                         : (Gecko.chatTitle || "New chat")
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -176,6 +178,21 @@ PanelWindow {
             text: "front_hand"
             color: Theme.errorText
             iconSize: 20
+        }
+        IconButton { // Inbox with unread badge
+            iconName: "inbox"
+            tip: Gecko.inboxUnread ? `Inbox (${Gecko.inboxUnread} unread)` : "Inbox"
+            onClicked: Gecko.page = Gecko.page === "inbox" ? "chat" : "inbox"
+            Rectangle {
+                visible: Gecko.inboxUnread > 0
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 4
+                width: 8
+                height: 8
+                radius: 4
+                color: Theme.accent
+            }
         }
         IconButton {
             iconName: "calendar_month"

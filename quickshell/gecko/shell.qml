@@ -31,6 +31,7 @@ ShellRoot {
         function activity(): void { Gecko.page = "activity"; Gecko.open = true }
         function memory(): void { Gecko.page = "memory"; Gecko.open = true }
         function calendar(): void { Gecko.page = "calendar"; Gecko.open = true }
+        function inbox(): void { Gecko.page = "inbox"; Gecko.open = true }
         function ask(text: string): void {
             Gecko.newChat();
             Gecko.open = true;
