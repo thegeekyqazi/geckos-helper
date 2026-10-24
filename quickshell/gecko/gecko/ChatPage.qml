@@ -24,6 +24,15 @@ Item {
         return !(last.kind === "agent" && last.streaming) && last.permState !== "pending";
     }
 
+    Connections {
+        target: Gecko
+        function onPrefillRequested(text) {
+            input.text = text;
+            input.cursorPosition = text.length;
+            input.forceActiveFocus();
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0

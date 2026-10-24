@@ -363,6 +363,13 @@ Singleton {
         root.call("watchers", { remove: id }, r => root.watchers = r.watchers);
     }
 
+    // Put text in the chat box (from other pages), switching to a new chat
+    signal prefillRequested(string text)
+    function prefill(text) {
+        root.newChat();
+        root.prefillRequested(text);
+    }
+
     property var memories: []
     property string memoryDir: ""
     function refreshMemories() {
