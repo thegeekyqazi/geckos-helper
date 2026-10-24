@@ -11,19 +11,20 @@ PanelWindow {
     visible: Gecko.open
 
     property bool extend: false
-    property real panelWidth: extend ? Appearance.sizes.sidebarWidthExtended : Appearance.sizes.sidebarWidth
+    property real panelWidth: extend ? Theme.width * 1.5 : Theme.width
 
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: 0
-    implicitWidth: Appearance.sizes.sidebarWidthExtended + Appearance.sizes.elevationMargin
+    implicitWidth: Theme.width * 1.5 + Appearance.sizes.elevationMargin * 2
     WlrLayershell.namespace: "quickshell:gecko"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
     color: "transparent"
 
     anchors {
         top: true
-        left: true
         bottom: true
+        left: !Theme.rightSide
+        right: Theme.rightSide
     }
 
     mask: Region {
@@ -46,15 +47,16 @@ PanelWindow {
     Rectangle {
         id: background
         anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.topMargin: Appearance.sizes.hyprlandGapsOut
-        anchors.leftMargin: Appearance.sizes.hyprlandGapsOut
-        width: panelWindow.panelWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
+        anchors.left: Theme.rightSide ? undefined : parent.left
+        anchors.right: Theme.rightSide ? parent.right : undefined
+        anchors.margins: Appearance.sizes.hyprlandGapsOut
+        width: panelWindow.panelWidth
         height: parent.height - Appearance.sizes.hyprlandGapsOut * 2
-        color: Appearance.colors.colLayer0
+        color: Theme.bg
         border.width: 1
-        border.color: Appearance.colors.colLayer0Border
-        radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
+        border.color: Theme.border
+        radius: Theme.radius
+        clip: true
         focus: true
 
         Behavior on width {
@@ -63,11 +65,14 @@ PanelWindow {
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
-                Gecko.open = false;
+                if (menu.shown) menu.shown = false;
+                else if (Gecko.page !== "chat") Gecko.page = "chat";
+                else Gecko.open = false;
             } else if (event.modifiers === Qt.ControlModifier) {
                 if (event.key === Qt.Key_O) panelWindow.extend = !panelWindow.extend;
                 else if (event.key === Qt.Key_N) Gecko.newChat();
                 else if (event.key === Qt.Key_H) Gecko.page = Gecko.page === "history" ? "chat" : "history";
+                else if (event.key === Qt.Key_T) Gecko.cycleTheme(1);
                 else return;
                 event.accepted = true;
             }
@@ -75,16 +80,30 @@ PanelWindow {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 10
-            spacing: 8
+            spacing: 0
 
             Header {
+                onMenuRequested: menu.shown = !menu.shown
                 Layout.fillWidth: true
+                Layout.margins: 8
+                Layout.bottomMargin: 0
             }
 
-            UsageBar {
+            Rectangle { // Theme errors stay visible until fixed
                 Layout.fillWidth: true
-                visible: Gecko.usage.five_hour !== undefined
+                Layout.margins: 8
+                visible: Theme.error.length > 0
+                implicitHeight: themeError.implicitHeight + 12
+                radius: Theme.cardRadius
+                color: Theme.errorBg
+                GText {
+                    id: themeError
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    text: `Theme error, using the last good theme:\n${Theme.error}`
+                    color: Theme.errorText
+                    rel: 0.8
+                }
             }
 
             StackLayout {
@@ -98,134 +117,75 @@ PanelWindow {
             }
         }
 
-        ModelMenu {
-            id: modelMenu
+        PanelMenu {
+            id: menu
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: 52
+            anchors.topMargin: 50
             anchors.rightMargin: 10
         }
     }
 
     component Header: RowLayout {
-        spacing: 4
+        id: header
+        signal menuRequested()
+        spacing: 2
 
-        MaterialSymbol {
-            text: "pest_control_rodent"
-            iconSize: Appearance.font.pixelSize.huge
-            color: Gecko.killed ? Appearance.colors.colError : Appearance.colors.colPrimary
-            Layout.leftMargin: 4
-        }
-        ColumnLayout {
+        RippleButton { // Chat title; opens history
             Layout.fillWidth: true
-            spacing: -2
-            StyledText {
-                text: "Gecko"
-                font.family: Appearance.font.family.title
-                font.pixelSize: Appearance.font.pixelSize.larger
-                color: Appearance.colors.colOnLayer0
+            implicitHeight: 38
+            buttonRadius: Theme.cardRadius
+            colBackground: "transparent"
+            colBackgroundHover: Theme.surfaceHigh
+            colRipple: Theme.border
+            onClicked: {
+                Gecko.refreshChats();
+                Gecko.page = Gecko.page === "history" ? "chat" : "history";
             }
-            StyledText {
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colSubtext
-                text: !Gecko.connected ? "Daemon offline (systemctl --user start geckos-helper)"
-                    : Gecko.killed ? "Kill switch on"
-                    : (Gecko.chatTitle || "New chat")
-            }
-        }
-        HeaderChip {
-            label: Gecko.chatModel || Gecko.defaultModel || "model"
-            onClicked: modelMenu.shown = !modelMenu.shown
-        }
-        HeaderButton { iconName: "add"; tip: "New chat (Ctrl+N)"; onClicked: Gecko.newChat() }
-        HeaderButton {
-            iconName: "history"; tip: "History (Ctrl+H)"
-            toggled: Gecko.page === "history"
-            onClicked: { Gecko.refreshChats(); Gecko.page = Gecko.page === "history" ? "chat" : "history"; }
-        }
-        HeaderButton {
-            iconName: "tune"; tip: "Capabilities"
-            toggled: Gecko.page === "settings"
-            onClicked: Gecko.page = Gecko.page === "settings" ? "chat" : "settings"
-        }
-        HeaderButton {
-            iconName: "front_hand"; tip: Gecko.killed ? "Kill switch is ON (click to turn off)" : "Kill switch"
-            toggled: Gecko.killed
-            colBackgroundToggled: Appearance.colors.colError
-            onClicked: Gecko.setKilled(!Gecko.killed)
-        }
-    }
-
-    component HeaderButton: RippleButton {
-        id: hb
-        property string iconName
-        property string tip
-        implicitWidth: 34
-        implicitHeight: 34
-        buttonRadius: Appearance.rounding.full
-        contentItem: MaterialSymbol {
-            anchors.centerIn: parent
-            horizontalAlignment: Text.AlignHCenter
-            text: hb.iconName
-            iconSize: Appearance.font.pixelSize.larger
-            color: hb.toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer0
-        }
-        StyledToolTip { text: hb.tip }
-    }
-
-    component HeaderChip: RippleButton {
-        id: chip
-        property alias label: chipText.text
-        implicitHeight: 30
-        implicitWidth: chipRow.implicitWidth + 20
-        buttonRadius: Appearance.rounding.full
-        colBackground: Appearance.colors.colSecondaryContainer
-        colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-        contentItem: Item {
-            RowLayout {
-                id: chipRow
-                anchors.centerIn: parent
-                spacing: 2
-                StyledText {
-                    id: chipText
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colOnSecondaryContainer
+            contentItem: RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 6
+                spacing: 6
+                GText {
+                    Layout.fillWidth: true
+                    text: !Gecko.connected ? "Gecko is offline"
+                        : Gecko.page === "history" ? "Chats"
+                        : Gecko.page === "settings" ? "Settings"
+                        : (Gecko.chatTitle || "New chat")
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    wrapMode: Text.NoWrap
                 }
                 MaterialSymbol {
-                    text: "expand_more"
-                    color: Appearance.colors.colOnSecondaryContainer
+                    text: Gecko.page === "history" ? "expand_less" : "expand_more"
+                    color: Theme.textMuted
+                    iconSize: 18
                 }
             }
         }
-    }
 
-    component UsageBar: RowLayout {
-        spacing: 10
-        Repeater {
-            model: [["5h", "five_hour"], ["7d", "seven_day"]]
-            delegate: RowLayout {
-                required property var modelData
-                Layout.fillWidth: true
-                spacing: 6
-                property real value: Gecko.usage[modelData[1]] ?? 0
-                StyledText {
-                    text: modelData[0]
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colSubtext
-                }
-                StyledProgressBar {
-                    Layout.fillWidth: true
-                    valueBarWidth: width
-                    value: parent.value
-                }
-                StyledText {
-                    text: `${Math.round(parent.value * 100)}%`
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colSubtext
-                }
-            }
+        MaterialSymbol { // Kill switch indicator
+            visible: Gecko.killed
+            text: "front_hand"
+            color: Theme.errorText
+            iconSize: 20
+        }
+        IconButton {
+            iconName: "palette"
+            tip: `Theme: ${Theme.name} (click for next, right-click for previous)`
+            onClicked: Gecko.cycleTheme(1)
+            altAction: () => Gecko.cycleTheme(-1)
+        }
+        IconButton {
+            iconName: "edit_square"
+            tip: "New chat (Ctrl+N)"
+            onClicked: Gecko.newChat()
+        }
+        IconButton {
+            iconName: "more_horiz"
+            tip: "More"
+            onClicked: header.menuRequested()
         }
     }
 }
