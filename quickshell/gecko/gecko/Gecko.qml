@@ -73,7 +73,8 @@ Singleton {
             delete root.callbacks[msg.reply];
             if (!msg.ok) {
                 root.exporting = false;
-                root.addError(msg.error);
+                if (!msg.error.startsWith("AttributeError")) root.addError(msg.error);
+                else console.warn("[Gecko] daemon lacks op:", msg.error);
             }
             else if (cb) cb(msg);
             return;
@@ -314,6 +315,18 @@ Singleton {
 
     function setKilled(on) {
         root.call("kill", { on: on });
+    }
+
+    property var activity: []
+    property var watchers: []
+    property var goals: []
+    function refreshActivity() {
+        root.call("activity", { limit: 150 }, r => root.activity = r.entries);
+        root.call("watchers", {}, r => root.watchers = r.watchers);
+        root.call("goals", {}, r => root.goals = r.goals);
+    }
+    function deleteWatcher(id) {
+        root.call("watchers", { remove: id }, r => root.watchers = r.watchers);
     }
 
     property var rules: []
