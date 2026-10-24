@@ -12,4 +12,5 @@ prompt = """Write my morning briefing for today. Sections (skip any that are emp
 3. **Weather**: today's weather, especially rain and temperature when I'm likely out.
 4. **Projects**: the next step for each active project or goal (project_next_actions).
 5. **Suggestion**: one concrete thing to focus on today.
-Keep it short and scannable."""
+Keep it short and scannable. If there are clear actions for today that aren't already
+on my to-do list, suggest up to 3 to-dos (gecko-todos block)."""
