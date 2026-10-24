@@ -316,7 +316,11 @@ class Daemon:
 
     async def run_watcher(self, w: dict) -> None:
         async with self.watcher_lock:  # one at a time, so they don't pile up on usage
-            entry = await watchers.run(w)
+            await self.broadcast({"event": "watcher_running", "on": True, "name": w["name"]})
+            try:
+                entry = await watchers.run(w)
+            finally:
+                await self.broadcast({"event": "watcher_running", "on": False})
         await self.broadcast({"event": "activity", **entry, "kind": "watcher"})
 
     async def schedule_watchers(self) -> None:
