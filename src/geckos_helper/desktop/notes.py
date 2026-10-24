@@ -1,6 +1,7 @@
-"""Desktop sticky notes, shared with the Notes widget of the desktop widgets
+"""Desktop sticky notes, shared with the Notes widget of Gecko's dots
 (~/.local/state/quickshell/user/desktopnotes.txt: a JSON list of
-{id, content, attachments, createdAt}).
+{id, content, attachments, createdAt}). Optional: without those desktop widgets
+there is nowhere to show the notes, so the tools and /note are left out.
 """
 
 import json
@@ -10,6 +11,11 @@ import time
 from .. import paths
 
 NOTES_FILE = paths.HOME / ".local/state/quickshell/user/desktopnotes.txt"
+WIDGETS_CONFIG = paths.HOME / ".config/quickshell/nowplaying-desktop"  # Gecko's dots desktop widgets
+
+
+def available() -> bool:
+    return WIDGETS_CONFIG.exists()
 
 
 def _load() -> list[dict]:

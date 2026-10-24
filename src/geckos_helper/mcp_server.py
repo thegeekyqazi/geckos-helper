@@ -252,34 +252,35 @@ def obsidian_append(path: str, content: str) -> str:
     return obsidian.append(path, content)
 
 
-# --- desktop notes ------------------------------------------------------------
+# --- desktop notes (only with Gecko's dots desktop widgets) -------------------
 
-@server.tool()
-@gated("notes")
-def notes_list() -> list[dict]:
-    """The user's desktop sticky notes (the Notes widget on the desktop)."""
-    return notes.list_notes()
-
-
-@server.tool()
-@gated("notes", writes=True)
-def notes_add(content: str) -> dict:
-    """Pin a short note to the desktop Notes widget ("jot this on my desktop")."""
-    return notes.add(content)
+if notes.available():
+    @server.tool()
+    @gated("notes")
+    def notes_list() -> list[dict]:
+        """The user's desktop sticky notes (the Notes widget on the desktop)."""
+        return notes.list_notes()
 
 
-@server.tool()
-@gated("notes", writes=True)
-def notes_update(note_id: str, content: str) -> dict:
-    """Replace a desktop note's text (id from notes_list)."""
-    return notes.update(note_id, content)
+    @server.tool()
+    @gated("notes", writes=True)
+    def notes_add(content: str) -> dict:
+        """Pin a short note to the desktop Notes widget ("jot this on my desktop")."""
+        return notes.add(content)
 
 
-@server.tool()
-@gated("notes", writes=True)
-def notes_delete(note_id: str) -> str:
-    """Remove a desktop note (id from notes_list)."""
-    return notes.delete(note_id)
+    @server.tool()
+    @gated("notes", writes=True)
+    def notes_update(note_id: str, content: str) -> dict:
+        """Replace a desktop note's text (id from notes_list)."""
+        return notes.update(note_id, content)
+
+
+    @server.tool()
+    @gated("notes", writes=True)
+    def notes_delete(note_id: str) -> str:
+        """Remove a desktop note (id from notes_list)."""
+        return notes.delete(note_id)
 
 
 # --- projects, goals and ideas ----------------------------------------------
