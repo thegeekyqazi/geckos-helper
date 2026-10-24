@@ -40,6 +40,7 @@ PanelWindow {
     onVisibleChanged: if (visible) chatPage.focusInput()
 
     StyledRectangularShadow {
+        visible: Theme.shadow
         target: background
         radius: background.radius
     }
@@ -53,11 +54,23 @@ PanelWindow {
         width: panelWindow.panelWidth
         height: parent.height - Appearance.sizes.hyprlandGapsOut * 2
         color: Theme.bg
-        border.width: 1
+        border.width: Theme.borderWidth
         border.color: Theme.border
         radius: Theme.radius
         clip: true
         focus: true
+
+        Rectangle { // Sheen: a soft light falling across glass themes
+            anchors.fill: parent
+            radius: parent.radius
+            visible: Theme.sheen.a > 0
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: Theme.sheen }
+                GradientStop { position: 0.45; color: "transparent" }
+                GradientStop { position: 1.0; color: Qt.alpha(Theme.sheen, Theme.sheen.a * 0.4) }
+            }
+        }
 
         Behavior on width {
             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)

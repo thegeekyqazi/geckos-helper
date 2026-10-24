@@ -35,6 +35,11 @@ Singleton {
     readonly property color composerBg: t.composer_bg ?? Appearance.colors.colLayer2
     readonly property color codeBg: t.code_bg ?? Appearance.colors.colLayer2
 
+    // Glass / blur looks: a light gradient over the panel, edge width, drop shadow
+    readonly property color sheen: t.sheen ?? "transparent"
+    readonly property real borderWidth: t.border_width ?? 1
+    readonly property bool shadow: t.shadow ?? true
+
     readonly property real radius: t.radius ?? 22
     readonly property real cardRadius: t.card_radius ?? 14
     readonly property real bubbleRadius: t.bubble_radius ?? 20
