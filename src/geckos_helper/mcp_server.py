@@ -12,9 +12,9 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import handoff_export, paths, watchers
+from . import activity, handoff_export, paths, watchers
 from .config import load_state
-from .desktop import calendar, obsidian, system, todo, untrusted
+from .desktop import calendar, goals, obsidian, system, todo, untrusted
 from .desktop import weather as weather_mod
 from .handoff import open_claude_code
 
@@ -204,6 +204,40 @@ def obsidian_write_note(path: str, content: str, overwrite: bool = False) -> str
 def obsidian_append(path: str, content: str) -> str:
     """Append text to the end of a note, creating it if needed."""
     return obsidian.append(path, content)
+
+
+# --- goals ------------------------------------------------------------------
+
+@server.tool()
+@gated("goals", writes=True)
+def goal_create(title: str, why: str, steps: list[str], deadline: str | None = None) -> str:
+    """Turn a goal into a tracked plan note in the vault (Gecko/Goals/<title>.md).
+
+    `steps` are concrete, ordered actions; add due dates in Tasks format
+    ("Review recursion 📅 2026-10-25"). `deadline` is YYYY-MM-DD.
+    """
+    path = goals.create(title, why, steps, deadline)
+    activity.log("goal", goal=title, note="plan created")
+    return path
+
+
+@server.tool()
+@gated("goals")
+def goal_list(include_done: bool = False) -> list[dict]:
+    """The user's goals with progress (done/total steps), deadline and next step."""
+    return goals.list_goals(include_done)
+
+
+@server.tool()
+@gated("goals", writes=True)
+def goal_update(goal: str, note: str = "", complete_step: str = "", add_steps: list[str] | None = None,
+                status: str = "") -> dict:
+    """Log progress on a goal: a dated note, tick a step (text match), add steps, or set
+    status ("active", "paused", "done")."""
+    result = goals.update(goal, note, complete_step, add_steps, status)
+    activity.log("goal", goal=result["title"],
+                 note=note or (f"done: {complete_step}" if complete_step else status or "plan updated"))
+    return result
 
 
 # --- watchers ---------------------------------------------------------------

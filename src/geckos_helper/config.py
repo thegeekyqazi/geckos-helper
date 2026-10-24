@@ -51,6 +51,7 @@ CAPABILITIES: dict[str, str] = {
     "chat_search": "Search your past Gecko chats",
     "weather": "Current weather and the forecast",
     "watchers": "Create and manage background watchers",
+    "goals": "Track goals and plans in your Obsidian vault",
 }
 DEFAULT_OFF = {"clipboard_read"}
 
