@@ -22,6 +22,7 @@ Item {
     required property string permState
     required property string tool
     required property string inputJson
+    required property string extra // user messages: JSON list of attachments
 
     // Assistant-side entries (text, tools, thoughts) sit indented under the avatar
     readonly property real indent: 34
@@ -74,11 +75,31 @@ Item {
     Component {
         id: userBubble
         Item {
-            implicitHeight: bubble.implicitHeight + 6
-            Rectangle {
-                id: bubble
+            readonly property var atts: { try { return JSON.parse(root.extra || "[]"); } catch (e) { return []; } }
+            implicitHeight: bubble.implicitHeight + 6 + (attRow.visible ? attRow.implicitHeight + 6 : 0)
+            Flow { // Attachments sent with this message
+                id: attRow
+                visible: parent.atts.length > 0
                 anchors.right: parent.right
                 anchors.top: parent.top
+                anchors.topMargin: 6
+                width: parent.width * 0.85
+                layoutDirection: Qt.RightToLeft
+                spacing: 6
+                Repeater {
+                    model: attRow.parent.atts
+                    delegate: AttachmentChip {
+                        required property var modelData
+                        attachment: modelData
+                        removable: false
+                    }
+                }
+            }
+            Rectangle {
+                id: bubble
+                visible: root.text.length > 0
+                anchors.right: parent.right
+                anchors.top: attRow.visible ? attRow.bottom : parent.top
                 anchors.topMargin: 6
                 width: Math.min(parent.width * 0.85, userText.implicitWidth + 28)
                 implicitHeight: userText.implicitHeight + 20
