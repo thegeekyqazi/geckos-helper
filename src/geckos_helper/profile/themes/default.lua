@@ -36,4 +36,8 @@ return {
     -- identity
     assistant_name = "Gecko",
     avatar         = "🦎",
+    -- desktop mascot: "always", "busy" (only while working / waiting) or "off"
+    mascot         = "always",
+    mascot_corner  = "bottom-right",  -- top-left, top-right, bottom-left, bottom-right
+    mascot_size    = 52,
 }
