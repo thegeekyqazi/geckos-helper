@@ -120,6 +120,27 @@ name = "University"
 url = "https://outlook.office365.com/owa/calendar/.../calendar.ics"
 ```
 
+### Google Calendar (read and write)
+
+Gecko talks to Google with your own OAuth client, so nothing goes through a
+third-party server. One-time setup (about 10 minutes):
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com), create a project (e.g. "Gecko").
+2. **APIs & Services › Library**: enable **Google Calendar API**.
+3. **Google Auth Platform** (OAuth consent screen): app name "Gecko", audience
+   **External**, your Gmail as support and developer contact.
+4. **Audience**: add your Gmail as a **test user**. Then **Publish app**: in
+   "Testing" mode Google expires the login every 7 days. Publishing a personal app
+   doesn't need review; you'll just see an "unverified app" screen at sign-in
+   (Advanced › Go to Gecko).
+5. **Clients › Create client › Desktop app**, then download the JSON and save it as
+   `~/.config/geckos-helper/google-client.json`.
+6. Run `gecko calendar login`, sign in in the browser, and check with `gecko calendar list`.
+
+New events go to your primary Google calendar unless you set `write_to` under
+`[calendar.google]`. The Laurier feed stays read-only; when something belongs
+there, Gecko gives you the details to add in Outlook.
+
 ## Roadmap
 
 - [x] Daemon, Claude Code backend, permission round-trip, chat resume
@@ -134,7 +155,8 @@ url = "https://outlook.office365.com/owa/calendar/.../calendar.ics"
 - [x] Watchers: read-only background checks that notify you ("tell me if it'll rain before class")
 - [x] Goals: turn a goal into a tracked plan in Obsidian with progress and next steps
 - [x] Desktop mascot showing idle / working / needs-approval
-- [ ] Writable calendar: Google Calendar (read/write) behind a provider layer (DavMail later if Laurier ICT allows) + calendar widget
+- [x] Calendar layer (ICS + Google read/write), clash check, calendar page in the panel
+- [ ] DavMail / CalDAV provider for Outlook writes, only if Laurier ICT approves
 - [ ] Safety: injection classifier, read-only profile for unattended runs
 - [ ] Scheduler recipes, event triggers, activity inbox, usage budget, daily briefing
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
