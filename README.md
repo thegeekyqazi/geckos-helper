@@ -9,6 +9,25 @@ vault, media and system info.
 > Status: **early but usable**. The panel (Super+A), the daemon, the desktop MCP server,
 > the context generator and a terminal client work. See the roadmap.
 
+![Gecko's Helper answering a weather question next to end-4's desktop widgets](docs/media/desktop-answer.jpg)
+
+<p align="center">
+  <img src="docs/media/demo.gif" width="460" alt="Opening the panel, the / command palette, and a calendar question answered with a desktop tool">
+  <br><sub>Full-screen recording: <a href="docs/media/demo.mp4">demo.mp4</a></sub>
+</p>
+
+| Start | / commands | Approvals | Calendar |
+|:-:|:-:|:-:|:-:|
+| <img src="docs/media/panel-start.png" width="220"> | <img src="docs/media/panel-commands.png" width="220"> | <img src="docs/media/panel-approval.png" width="220"> | <img src="docs/media/panel-calendar.png" width="220"> |
+
+**Quick ask** on Super+Space, from anywhere:
+
+<img src="docs/media/quickask.jpg" width="720" alt="Quick ask box over the desktop">
+
+**Themes in Lua**: default (follows your wallpaper), midnight and claude:
+
+<img src="docs/media/themes.png" width="720" alt="Three themes side by side">
+
 ## The panel
 
 `qs -c gecko`, a separate Quickshell config that reuses end-4's own widgets and
