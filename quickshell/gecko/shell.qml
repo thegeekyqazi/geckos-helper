@@ -18,11 +18,14 @@ ShellRoot {
 
     GeckoPanel {}
     Mascot {}
+    QuickAsk { id: quickAsk }
 
     IpcHandler {
         target: "gecko"
 
         function toggle(): void { Gecko.open = !Gecko.open }
+        function quickAsk(): void { quickAsk.shown = !quickAsk.shown }
+        function prefill(text: string): void { Gecko.open = true; Gecko.prefill(text) }
         function open(): void { Gecko.open = true }
         function close(): void { Gecko.open = false }
         function newChat(): void { Gecko.newChat(); Gecko.open = true }
