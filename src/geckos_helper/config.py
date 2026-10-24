@@ -27,6 +27,11 @@ obsidian_vault = "~/stuff/Obsidian/Vault 0"
 obsidian_inbox = "Gecko/Inbox.md"   # where captured ideas go, relative to the vault
 weather_city = ""                   # empty = located from your IP, like end-4's bar
 
+[guard]
+# Tool results are scanned for prompt injection. A borderline result (one weak
+# signal) gets a second opinion from Haiku; turn off to save usage.
+model_check = true
+
 # Google Calendar (read/write): see README, then `gecko calendar login`.
 [calendar.google]
 calendars = []   # names or ids to show; empty = all your Google calendars
