@@ -27,6 +27,12 @@ obsidian_vault = "~/stuff/Obsidian/Vault 0"
 obsidian_inbox = "Gecko/Inbox.md"   # where captured ideas go, relative to the vault
 weather_city = ""                   # empty = located from your IP, like end-4's bar
 
+[budget]
+# Background work (watchers, recipes) pauses before it eats into your own chats.
+max_unattended_runs_per_day = 40
+pause_above_five_hour = 0.8   # pause while the 5-hour usage window is 80%+ used
+pause_above_seven_day = 0.9
+
 [guard]
 # Tool results are scanned for prompt injection. A borderline result (one weak
 # signal) gets a second opinion from Haiku; turn off to save usage.
