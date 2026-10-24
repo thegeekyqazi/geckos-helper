@@ -24,7 +24,8 @@ idle_timeout_minutes = 15  # stop an idle agent process (the chat can be resumed
 [desktop]
 terminal = "kitty"
 obsidian_vault = "~/stuff/Obsidian/Vault 0"
-obsidian_inbox = "Gecko/Inbox.md"   # where captured ideas go, relative to the vault
+obsidian_inbox = "Projects/Ideas.md"  # where /idea and captured ideas go, relative to the vault
+projects_folder = "Projects"          # new project and goal notes (plus Projects Hub.md)
 weather_city = ""                   # empty = located from your IP, like end-4's bar
 
 [budget]
@@ -68,7 +69,7 @@ CAPABILITIES: dict[str, str] = {
     "chat_search": "Search your past Gecko chats",
     "weather": "Current weather and the forecast",
     "watchers": "Create and manage background watchers",
-    "goals": "Track goals and plans in your Obsidian vault",
+    "projects": "Track projects, goals and ideas in your Obsidian vault",
     "recipes": "Create, enable and run recipes; read the inbox",
     "notes": "Read and write your desktop sticky notes",
 }
