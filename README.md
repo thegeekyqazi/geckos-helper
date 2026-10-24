@@ -43,7 +43,7 @@ Works on its own with end-4. **Optionally** pairs with the desktop widgets from
 [Gecko's dots](https://github.com/thegeekyqazi/geckos-dots):
 the to-do and notes widgets share Gecko's files, and the calendar widget reads the
 shared feed `~/.local/state/geckos-helper/calendar.json` (refreshed every 10 minutes)
-to show your events.
+to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 - Streaming replies with markdown, collapsible tool cards, "thinking" blocks
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**

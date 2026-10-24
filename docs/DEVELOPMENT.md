@@ -3,6 +3,11 @@
 Notes for working on the code (people or AI sessions). User-facing docs are the
 README, [THEMES.md](THEMES.md), [RECIPES.md](RECIPES.md) and [PROJECTS.md](PROJECTS.md).
 
+Gecko's Helper is the AI half; [Gecko's dots](INTEGRATION.md) is the optional desktop
+half. Rule: if it needs the AI it goes here, otherwise in the dots. **Helper must keep
+working on plain end-4 without the dots**: detect dots features at runtime (see
+`desktop/notes.available()`), never require them.
+
 ## Architecture
 
 ```
