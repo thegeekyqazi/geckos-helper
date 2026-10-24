@@ -9,24 +9,25 @@ vault, media and system info.
 > Status: **early but usable**. The panel (Super+A), the daemon, the desktop MCP server,
 > the context generator and a terminal client work. See the roadmap.
 
-![Gecko's Helper answering a weather question next to end-4's desktop widgets](docs/media/desktop-answer.jpg)
+![Gecko's Helper: typing a / command, then a weather question answered with a desktop tool](docs/media/demo.gif)
 
-<p align="center">
-  <img src="docs/media/demo.gif" width="460" alt="Opening the panel, the / command palette, and a calendar question answered with a desktop tool">
-  <br><sub>Full-screen recording: <a href="docs/media/demo.mp4">demo.mp4</a></sub>
-</p>
+<sub>Full-quality video: [main.mp4](docs/media/main.mp4)</sub>
 
 | Start | / commands | Approvals | Calendar |
 |:-:|:-:|:-:|:-:|
-| <img src="docs/media/panel-start.png" width="220"> | <img src="docs/media/panel-commands.png" width="220"> | <img src="docs/media/panel-approval.png" width="220"> | <img src="docs/media/panel-calendar.png" width="220"> |
+| <img src="docs/media/panel-start.jpg" width="220"> | <img src="docs/media/panel-commands.jpg" width="220"> | <img src="docs/media/panel-approval.jpg" width="220"> | <img src="docs/media/panel-calendar.jpg" width="220"> |
 
-**Quick ask** on Super+Space, from anywhere:
+**Quick ask** on Super+Space, from anywhere: `/todo` lands on the desktop to-do widget at once, a question opens the panel with the answer.
 
-<img src="docs/media/quickask.jpg" width="720" alt="Quick ask box over the desktop">
+![Quick ask: a /todo command, then a calendar question](docs/media/quickask.gif)
 
-**Themes in Lua**: default (follows your wallpaper), midnight and claude:
+<sub>[quickask.mp4](docs/media/quickask.mp4)</sub>
 
-<img src="docs/media/themes.png" width="720" alt="Three themes side by side">
+**Themes in Lua**, switched with Ctrl+T or the palette button: glass, midnight, blur, claude and default (follows your wallpaper).
+
+<p align="center"><img src="docs/media/themes.gif" width="320" alt="Cycling through the five themes"></p>
+
+![The five themes side by side](docs/media/themes.jpg)
 
 ## The panel
 
