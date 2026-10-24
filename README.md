@@ -86,9 +86,15 @@ still open end-4's).
   remembers the exact command, never a whole program.
 - **"Always"** saves a rule to `~/.config/geckos-helper/permission-rules.json`:
   glob patterns like `Bash:git status*`, allow or deny, last match wins.
-- **Watchers are read-only**: they can search the web and read the weather,
-  calendar, to-dos and vault, then notify you. They have no shell, no file edits,
-  and anything not pre-approved is denied without asking.
+- **Injection guard**: every tool result is scanned for prompt-injection patterns
+  (borderline third-party content gets a Haiku second opinion). A hit shows a red
+  card and taints the chat: saved "allow" rules and "this chat" approvals pause, and
+  every action needs your approval with a warning, until you clear it.
+- **Unattended runs are read-only** (watchers now, recipes later): web search, web
+  fetch only for domains the watcher lists, Gecko's read-only tools, no shell or
+  file edits, nothing prompted (`dontAsk`), only the gecko MCP server, which itself
+  runs with `GECKO_READONLY=1` and refuses writes. Results are guard-scanned before
+  they reach your notifications.
 
 ## Install
 
@@ -157,7 +163,7 @@ there, Gecko gives you the details to add in Outlook.
 - [x] Desktop mascot showing idle / working / needs-approval
 - [x] Calendar layer (ICS + Google read/write), clash check, calendar page in the panel
 - [ ] DavMail / CalDAV provider for Outlook writes, only if Laurier ICT approves
-- [ ] Safety: injection classifier, read-only profile for unattended runs
+- [x] Safety: injection guard with chat tainting, read-only profile for unattended runs
 - [ ] Scheduler recipes, event triggers, activity inbox, usage budget, daily briefing
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
 - [ ] Desktop context buttons (clipboard, focused window, screenshot region), quick-ask keybind
