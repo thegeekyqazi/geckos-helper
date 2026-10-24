@@ -262,6 +262,7 @@ class Daemon:
         return {"killed": state["killed"], "capabilities": state["capabilities"],
                 "capability_descriptions": config.CAPABILITIES, "default_model": config.default_model(),
                 "budget": budget.status(self.usage),
+                "features": {"desktop_notes": notes.available()},
                 "running": list(self.backends), "usage": self.usage, "pid": os.getpid()}
 
     async def op_kill(self, req: dict) -> dict:
@@ -346,6 +347,8 @@ class Daemon:
         if action == "todo":
             result = await asyncio.to_thread(todo.add, text)
         elif action == "note":
+            if not notes.available():
+                raise ValueError("Desktop notes need the desktop widgets from Gecko's dots")
             result = await asyncio.to_thread(notes.add, text)
         elif action == "idea":
             result = {"path": await asyncio.to_thread(obsidian.capture_idea, text)}
