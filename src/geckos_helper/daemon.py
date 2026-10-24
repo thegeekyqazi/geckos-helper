@@ -15,12 +15,26 @@ import time
 from datetime import date
 from typing import Any
 
-from . import activity, config, context, handoff_export, memory, paths, rules, theme, watchers
+from . import activity, config, context, guard, handoff_export, memory, paths, rules, theme, watchers
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, goals
 from .store import Store
 
 log = logging.getLogger("gecko")
+
+
+TAINT_FILE = paths.STATE_DIR / "tainted-chats.json"
+
+
+def load_taint() -> dict[str, dict]:
+    try:
+        return json.loads(TAINT_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_taint(taint: dict[str, dict]) -> None:
+    TAINT_FILE.write_text(json.dumps(taint))
 
 
 DENIED = ("The user denied this action. Do not retry it or work around it; "
@@ -53,6 +67,10 @@ class Daemon:
         # Calls the user denied this turn: an identical retry is denied without asking again
         self.turn_denials: dict[str, set[str]] = {}
         self.request_info: dict[str, dict] = {}  # request_id -> the permission_request
+        # Injection guard: tool names by call id, scans in flight, and tainted chats
+        self.tool_names: dict[str, str] = {}
+        self.scans: dict[str, list[asyncio.Task]] = {}
+        self.taint: dict[str, dict] = load_taint()
         self.usage: dict[str, Any] = {}
         self.watcher_lock = asyncio.Lock()
 
@@ -71,7 +89,19 @@ class Daemon:
         async def emit(kind: str, data: dict) -> None:
             if kind == "session_ready":
                 self.store.update(chat_id, session_id=data["session_id"])
+            elif kind == "tool_call":
+                self.tool_names[data["id"]] = data["name"]
+            elif kind == "tool_call_update" and data.get("output"):
+                name = self.tool_names.get(data["id"], "")
+                self.scans.setdefault(chat_id, []).append(
+                    asyncio.create_task(self.guard_scan(chat_id, name, data["output"])))
             elif kind == "permission_request":
+                # Decide only after every pending scan of what the agent just read
+                await asyncio.gather(*self.scans.pop(chat_id, []), return_exceptions=True)
+                if taint := self.taint.get(chat_id):
+                    data["warning"] = (f"Gecko read content from {taint['source']} that looked like a prompt "
+                                       f"injection ({', '.join(taint['reasons'])}). Saved rules are paused "
+                                       "for this chat; only allow this if you asked for it.")
                 if auto := self.auto_decision(chat_id, data):
                     allow, by = auto
                     note = " You already asked for this exact action." if by == "repeat" else ""
@@ -127,11 +157,35 @@ class Daemon:
         tool, inp = data["tool"], data["input"]
         if call_key(tool, inp) in self.turn_denials.get(chat_id, ()):
             return False, "repeat"
-        if decision := rules.decide(tool, inp):
-            return decision == "allow", "rule"
+        decision = rules.decide(tool, inp)
+        if decision == "deny":
+            return False, "rule"
+        if chat_id in self.taint:  # possible injection: no automatic allows
+            return None
+        if decision == "allow":
+            return True, "rule"
         if rule_key(tool, inp) in self.chat_allows.get(chat_id, ()):
             return True, "chat"
         return None
+
+    async def guard_scan(self, chat_id: str, tool: str, output: str) -> None:
+        third_party = (tool in ("WebFetch", "WebSearch") or tool.startswith("mcp__claude_ai_")
+                       or "<untrusted-content" in output)
+        verdict = await guard.scan(output, allow_model=third_party)
+        if not verdict.suspicious:
+            return
+        source = tool.replace("mcp__", "").replace("__", ": ") or "a tool"
+        self.taint[chat_id] = {"source": source, "reasons": verdict.reasons, "ts": time.time()}
+        save_taint(self.taint)
+        activity.log("guard", chat=chat_id, source=source, reasons=verdict.reasons)
+        await self.emitter(chat_id)("guard_alert", {"source": source, "reasons": verdict.reasons})
+
+    async def op_untaint(self, req: dict) -> dict:
+        """The user reviewed a guard alert and clears it for this chat."""
+        self.taint.pop(req["chat"], None)
+        save_taint(self.taint)
+        activity.log("guard", chat=req["chat"], source="you", reasons=["warning cleared"])
+        return {}
 
     async def op_permission(self, req: dict) -> dict:
         """allow: bool; scope: "once" (default), "chat" (this chat) or "always" (saved rule)."""
@@ -189,7 +243,8 @@ class Daemon:
         b = self.backends.get(req["chat"])
         pending = [rid for rid, c in self.pending.items() if c == req["chat"]]
         return {"chat": chat, "entries": self.store.transcript(req["chat"]),
-                "busy": bool(b and b.busy), "pending_permissions": pending}
+                "busy": bool(b and b.busy), "pending_permissions": pending,
+                "taint": self.taint.get(req["chat"])}
 
     async def op_delete(self, req: dict) -> dict:
         if b := self.backends.pop(req["chat"], None):

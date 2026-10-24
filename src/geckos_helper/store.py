@@ -28,7 +28,7 @@ SEARCHABLE_KINDS = ("user_message", "agent_message")
 
 # Events worth keeping in the transcript (streaming chunks are not).
 TRANSCRIPT_KINDS = {"user_message", "agent_message", "tool_call", "tool_call_update", "permission_request",
-                    "turn_end", "error"}
+                    "guard_alert", "turn_end", "error"}
 
 
 class Store:
