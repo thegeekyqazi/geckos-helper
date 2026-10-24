@@ -179,7 +179,8 @@ Singleton {
         if (kind !== "agent_thought_chunk") root.endThoughts();
         switch (kind) {
         case "user_message":
-            messages.append(root.entry({ kind: "user", text: e.text, streaming: false }));
+            messages.append(root.entry({ kind: "user", text: e.text, streaming: false,
+                                         extra: JSON.stringify(e.attachments ?? []) }));
             if (live) root.busy = true;
             break;
         case "agent_thought_chunk": {
@@ -258,7 +259,7 @@ Singleton {
     function entry(fields) {
         return Object.assign({ kind: "", text: "", streaming: false, toolId: "", title: "", name: "",
                                status: "", output: "", requestId: "", tool: "", inputJson: "{}",
-                               permState: "" }, fields);
+                               permState: "", extra: "" }, fields);
     }
 
     function addError(text) {
@@ -292,10 +293,106 @@ Singleton {
         root.call("chats", { limit: 100 }, r => root.chats = r.chats);
     }
 
+    // --- attachments ----------------------------------------------------------
+
+    property var attachments: [] // pending, shown as chips above the message box
+    property bool capturing: false
+
+    // kind: screenshot | window | clipboard | selection | file
+    function capture(kind) {
+        // Hide the panel so it isn't in the shot (and isn't the "focused" thing)
+        const hide = kind === "screenshot" || kind === "window" || kind === "file";
+        if (hide) root.open = false;
+        root.capturing = true;
+        captureDelay.kind = kind;
+        captureDelay.reopen = hide;
+        captureDelay.interval = hide ? 350 : 0;
+        captureDelay.restart();
+    }
+    Timer {
+        id: captureDelay
+        property string kind
+        property bool reopen
+        onTriggered: root.call("capture", { kind: kind }, r => {
+            root.capturing = false;
+            if (r.attachment) root.attachments = [...root.attachments, r.attachment];
+            else root.showToast(kind === "clipboard" || kind === "selection" ? "Nothing to attach" : "Cancelled");
+            if (reopen) { root.page = "chat"; root.open = true; }
+        })
+    }
+    function removeAttachment(index) {
+        const a = root.attachments.slice();
+        a.splice(index, 1);
+        root.attachments = a;
+    }
+
+    // --- toasts -----------------------------------------------------------------
+
+    property string toast: ""
+    function showToast(text) {
+        root.toast = text;
+        toastTimer.restart();
+    }
+    Timer { id: toastTimer; interval: 2600; onTriggered: root.toast = "" }
+
+    // --- slash commands ----------------------------------------------------------
+
+    // arg: what the command expects after its name ("" = nothing)
+    readonly property var commands: [
+        { name: "new", arg: "", desc: "Start a new chat", run: a => root.newChat() },
+        { name: "screenshot", arg: "", desc: "Attach a screenshot of a region", run: a => root.capture("screenshot") },
+        { name: "window", arg: "", desc: "Attach the focused window", run: a => root.capture("window") },
+        { name: "clipboard", arg: "", desc: "Attach the clipboard", run: a => root.capture("clipboard") },
+        { name: "selection", arg: "", desc: "Attach the selected text", run: a => root.capture("selection") },
+        { name: "file", arg: "", desc: "Attach a file", run: a => root.capture("file") },
+        { name: "todo", arg: "text", desc: "Add a to-do (instant, no AI)", run: a => root.quick("todo", a, "Added to your to-dos") },
+        { name: "note", arg: "text", desc: "Pin a desktop note (instant)", run: a => root.quick("note", a, "Pinned to your desktop notes") },
+        { name: "idea", arg: "text", desc: "Capture an idea in your vault (instant)", run: a => root.quick("idea", a, "Saved to your Gecko inbox note") },
+        { name: "remember", arg: "fact", desc: "Tell Gecko something to remember", run: a => root.send(`Remember this about me: ${a}`) },
+        { name: "model", arg: "sonnet|opus|haiku", desc: "Switch this chat's model", run: a => { root.setModel(a); root.showToast(`Model: ${a}`); } },
+        { name: "theme", arg: "[name]", desc: "Next theme, or switch to one", run: a => root.call("theme", a ? { name: a } : { step: 1 }) },
+        { name: "briefing", arg: "", desc: "Run the daily briefing now", run: a => { root.call("recipes", { run: "daily-briefing" }); root.showToast("Briefing running; it'll land in your inbox"); } },
+        { name: "handoff", arg: "", desc: "Copy a hand-off brief for Claude.ai", run: a => root.exportChat("brief") },
+        { name: "copy", arg: "", desc: "Copy this chat as markdown", run: a => root.exportChat("transcript") },
+        { name: "calendar", arg: "", desc: "Open the calendar", run: a => root.page = "calendar" },
+        { name: "inbox", arg: "", desc: "Open the inbox", run: a => root.page = "inbox" },
+        { name: "history", arg: "", desc: "Open chat history", run: a => { root.refreshChats(); root.page = "history"; } },
+        { name: "activity", arg: "", desc: "What Gecko did, watchers, recipes", run: a => root.page = "activity" },
+        { name: "memory", arg: "", desc: "What Gecko remembers", run: a => root.page = "memory" },
+        { name: "settings", arg: "", desc: "Capabilities and rules", run: a => root.page = "settings" },
+        { name: "kill", arg: "", desc: "Toggle the kill switch", run: a => root.setKilled(!root.killed) },
+    ]
+
+    function matchCommands(text) {
+        if (!text.startsWith("/")) return [];
+        const word = text.slice(1).split(" ")[0].toLowerCase();
+        if (text.includes(" ")) return root.commands.filter(c => c.name === word);
+        return root.commands.filter(c => c.name.startsWith(word));
+    }
+
+    // Run "/name arg". Returns false if it isn't a known command.
+    function runCommand(text) {
+        const m = text.trim().match(/^\/(\S+)\s*([\s\S]*)$/);
+        const cmd = m && root.commands.find(c => c.name === m[1].toLowerCase());
+        if (!cmd) return false;
+        if (cmd.arg && !cmd.arg.startsWith("[") && !m[2].trim()) {
+            root.showToast(`/${cmd.name} needs ${cmd.arg}`);
+            return true;
+        }
+        cmd.run(m[2].trim());
+        return true;
+    }
+
+    function quick(action, text, done) {
+        root.call("quick", { action: action, text: text }, () => root.showToast(done));
+    }
+
     function send(text) {
         text = text.trim();
-        if (!text.length) return;
-        const args = { text: text };
+        if (!text.length && !root.attachments.length) return;
+        if (text.startsWith("/") && root.runCommand(text)) return;
+        const args = { text: text, attachments: root.attachments };
+        root.attachments = [];
         if (root.chatId) {
             args.chat = root.chatId;
         } else {
