@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Any
 
-from . import (activity, budget, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+from . import (activity, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, goals
@@ -458,6 +458,15 @@ class Daemon:
             except Exception:
                 log.exception("scheduler")
 
+    async def refresh_calendar_feed(self) -> None:
+        """Keep the shared calendar.json fresh for desktop widgets."""
+        while True:
+            try:
+                await asyncio.to_thread(calendar_feed.write)
+            except Exception:
+                log.exception("calendar feed")
+            await asyncio.sleep(600)
+
     async def reap_idle(self) -> None:
         while True:
             await asyncio.sleep(60)
@@ -479,6 +488,7 @@ class Daemon:
         asyncio.create_task(self.reap_idle())
         asyncio.create_task(self.watch_theme())
         asyncio.create_task(self.schedule_unattended())
+        asyncio.create_task(self.refresh_calendar_feed())
         async with server:
             await server.serve_forever()
 
