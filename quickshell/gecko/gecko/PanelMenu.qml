@@ -10,6 +10,7 @@ Rectangle {
     id: root
     property bool shown: false
     visible: shown
+    onShownChanged: if (shown) Gecko.refreshStatus()
     z: 20
     implicitWidth: 250
     implicitHeight: column.implicitHeight + 12
@@ -102,6 +103,13 @@ Rectangle {
             visible: Gecko.usage.five_hour !== undefined
             spacing: 4
             GText { text: "Usage"; muted: true; rel: 0.75 }
+            GText {
+                visible: Gecko.budget.cap !== undefined
+                text: `Background: ${Gecko.budget.runs_today ?? 0}/${Gecko.budget.cap} runs today`
+                      + (Gecko.budget.ok === false ? ` · paused (${Gecko.budget.reason})` : "")
+                muted: true
+                rel: 0.72
+            }
             Repeater {
                 model: [["5 hours", "five_hour"], ["7 days", "seven_day"]]
                 delegate: RowLayout {
