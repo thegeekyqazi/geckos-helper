@@ -6,6 +6,7 @@ switching something off in the UI takes effect immediately, even mid-chat.
 
 import functools
 import json
+import os
 from datetime import date
 import time
 from typing import Any
@@ -30,6 +31,10 @@ server = MCPServer(
 )
 
 
+# Unattended runs (watchers) start the server with GECKO_READONLY=1: no writes at all
+READONLY = os.environ.get("GECKO_READONLY") == "1"
+
+
 class Disabled(ToolError):
     pass
 
@@ -51,6 +56,8 @@ def gated(capability: str, *, writes: bool = False):
                 raise Disabled("Gecko's Helper kill switch is on; desktop access is disabled.")
             if not state["capabilities"].get(capability):
                 raise Disabled(f"The user has turned off the '{capability}' capability.")
+            if writes and READONLY:
+                raise Disabled("This is a read-only (unattended) session; it cannot change anything.")
             if writes:
                 _log(fn.__name__, kwargs)
             return fn(*args, **kwargs)
@@ -284,15 +291,17 @@ def goal_update(goal: str, note: str = "", complete_step: str = "", add_steps: l
 @server.tool()
 @gated("watchers", writes=True)
 def watch_create(name: str, prompt: str, every_minutes: int | None = None,
-                 daily_at: list[str] | None = None) -> dict:
+                 daily_at: list[str] | None = None, fetch_domains: list[str] | None = None) -> dict:
     """Create a background watcher: a read-only check that notifies the user when it matters.
 
     `prompt` says what to check and when to notify ("Notify me if rain is likely
     between 8 and 9 tomorrow"). Schedule with every_minutes (15 or more) or daily_at
     times like ["07:30"]. Watchers can search the web, read the weather, calendar,
-    to-dos and vault; they can never act.
+    to-dos and vault; they can never act. To read specific websites, list their
+    domains in fetch_domains (e.g. ["laurierathletics.com"]); other sites can't be fetched.
     """
-    return watchers.describe(watchers.create(name, prompt, every_minutes, daily_at))
+    return watchers.describe(watchers.create(name, prompt, every_minutes, daily_at,
+                                             fetch_domains=fetch_domains))
 
 
 @server.tool()
