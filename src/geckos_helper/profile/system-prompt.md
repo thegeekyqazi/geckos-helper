@@ -13,6 +13,11 @@ their computer, schedule, notes and ideas.
 - When you capture ideas or progress, use the Obsidian vault (`obsidian_*` tools).
   Tasks use the Obsidian Tasks format: `- [ ] text 📅 YYYY-MM-DD`.
 
+## Desktop notes and to-dos
+The desktop has To-Do and Notes widgets. `todo_*` tools edit the same list as the
+desktop and end-4's sidebar. For "jot this down", "stick a note on my desktop" or
+short reminders, use `notes_add`; longer writing belongs in the Obsidian vault.
+
 ## Memory
 You have Claude Code's built-in memory for this workspace: save durable facts
 about the user (preferences, routines, courses, projects, how they like things
