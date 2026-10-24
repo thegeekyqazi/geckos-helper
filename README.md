@@ -210,13 +210,19 @@ there, Gecko gives you the details to add in Outlook.
 Collected from similar projects (Meta Muse, Hermes Agent, OpenClaw, Goose, Mofakir,
 Newelle, Raycast). Not scheduled yet.
 
-- **Approvals from your phone**: approval requests and results sent through ntfy or Telegram, so background work doesn't wait for you to be at the laptop
+- **Signal bridge** (next): Gecko in your Signal *Note to Self* via signal-cli linked to your own account: approvals, the briefing, watcher alerts and quick asks from your phone
+- **Phone tools**: send files and links to your phone, read texts (through the injection guard), send texts with approval, ring it; built on the phone connection in Gecko's dots
 - **Self-written skills**: a "save as recipe" button that turns a task that went well into a reusable skill
 - **Credential vault**: logins kept in the system keyring, usable by tools but never readable by the agent
 - **Cheap-model routing**: simple questions go to Haiku and harder ones to Sonnet automatically
 - **Push-to-talk voice**: local speech-to-text (whisper.cpp) and optional spoken replies
 - **Text-selection actions**: select text anywhere, press a key: explain, translate, summarize, make a to-do
-- **Study mode**: quizzes and flashcards generated from Obsidian course notes before a test
+- **Study mode**: quizzes in the panel and Anki decks (AnkiConnect) generated from Obsidian course notes before a test
+- **New test → study plan**: when a test appears in your calendar, a study-plan project is proposed in the inbox
+- **`/explain`**: select an error anywhere, Super+Space, `/explain`: what it means and a fix (hand off to Claude Code if it's real work)
+- **Laptop health recipe**: weekly battery health, disk, updates, failed services, end-4 patches still applied
+- **Gecko desktop widget**: next actions, inbox highlights and a small ask box on the desktop (with Gecko's dots)
+- **Prayer-aware scheduling**: study blocks avoid prayer times
 - **D2L / Brightspace sync**: assignments and deadlines from the D2L scraper into the calendar and to-dos
 - **Projects**: chats grouped per course or project, each with its own instructions and files
 - **Codex and OpenCode** as agents, through ACP (`opencode acp`, codex-acp); the daemon's events already use ACP names
