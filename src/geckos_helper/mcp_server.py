@@ -16,7 +16,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import activity, handoff_export, paths, recipes, watchers
 from .config import load_state
-from .desktop import calendar, goals, notes, obsidian, system, todo, untrusted
+from .desktop import calendar, notes, obsidian, projects, system, todo, untrusted
 from .desktop import weather as weather_mod
 from .handoff import open_claude_code
 
@@ -282,38 +282,78 @@ def notes_delete(note_id: str) -> str:
     return notes.delete(note_id)
 
 
-# --- goals ------------------------------------------------------------------
+# --- projects, goals and ideas ----------------------------------------------
 
 @server.tool()
-@gated("goals", writes=True)
-def goal_create(title: str, why: str, steps: list[str], deadline: str | None = None) -> str:
-    """Turn a goal into a tracked plan note in the vault (Gecko/Goals/<title>.md).
+@gated("projects", writes=True)
+def project_create(title: str, goal: str, tasks: list[str], kind: str = "project", status: str = "active",
+                   category: str = "💻 Tech & Projects", due: str = "") -> str:
+    """Create a project (or, with kind="goal", a personal goal) note in the vault's
+    Projects folder, in the user's own note style.
 
-    `steps` are concrete, ordered actions; add due dates in Tasks format
-    ("Review recursion 📅 2026-10-25"). `deadline` is YYYY-MM-DD.
+    goal: what success looks like, 1-3 sentences. tasks: 3-8 concrete next steps;
+    add due dates in Tasks format ("Pick a dataset 📅 2026-11-01"). status: idea,
+    active, on-hold or done. category like the user's notes: "💻 Tech & Projects",
+    "📚 Academics", "🧠 Health & Habits", "❤️ Family", "🌙 Faith & Growth",
+    "📖 Personal Growth", "🎲 Fun". due: YYYY-MM-DD.
     """
-    path = goals.create(title, why, steps, deadline)
-    activity.log("goal", goal=title, note="plan created")
+    path = projects.create(title, goal, tasks, category, status, due, kind, "🎯" if kind == "goal" else "📦")
+    activity.log("project", project=title, note=f"{kind} created")
     return path
 
 
 @server.tool()
-@gated("goals")
-def goal_list(include_done: bool = False) -> list[dict]:
-    """The user's goals with progress (done/total steps), deadline and next step."""
-    return goals.list_goals(include_done)
+@gated("projects")
+def project_list(status: str = "", kind: str = "") -> list[dict]:
+    """Tracked projects and goals: status, progress (done/total tasks), next task, due date,
+    last update. Filter by status (idea, active, on-hold, done) or kind (project, goal)."""
+    return projects.list_projects(status, kind)
 
 
 @server.tool()
-@gated("goals", writes=True)
-def goal_update(goal: str, note: str = "", complete_step: str = "", add_steps: list[str] | None = None,
-                status: str = "") -> dict:
-    """Log progress on a goal: a dated note, tick a step (text match), add steps, or set
-    status ("active", "paused", "done")."""
-    result = goals.update(goal, note, complete_step, add_steps, status)
-    activity.log("goal", goal=result["title"],
-                 note=note or (f"done: {complete_step}" if complete_step else status or "plan updated"))
+@gated("projects")
+def project_next_actions(limit: int = 10) -> list[dict]:
+    """Open tasks from active projects and goals, due-dated first: good to-do candidates."""
+    return projects.next_actions(limit)
+
+
+@server.tool()
+@gated("projects", writes=True)
+def project_update(project: str, note: str = "", complete_task: str = "", add_tasks: list[str] | None = None,
+                   status: str = "", due: str = "") -> dict:
+    """Log progress on a project or goal: a dated note, tick a task (text match), add tasks,
+    change status (idea, active, on-hold, done) or set a due date (YYYY-MM-DD)."""
+    result = projects.update(project, note, complete_task, add_tasks, status, due)
+    activity.log("project", project=result["title"],
+                 note=note or (f"done: {complete_task}" if complete_task else status or "plan updated"))
     return result
+
+
+@server.tool()
+@gated("projects", writes=True)
+def project_adopt(note: str, kind: str = "project", status: str = "active", category: str = "") -> dict:
+    """Start tracking an existing vault note (e.g. "Inventory Prediction Project") where it is."""
+    result = projects.adopt(note, kind, status, category)
+    activity.log("project", project=result["title"], note="now tracked")
+    return result
+
+
+@server.tool()
+@gated("projects")
+def ideas_list() -> list[dict]:
+    """Ideas from the user's ideas note, with the line number used by idea_promote."""
+    return projects.ideas()
+
+
+@server.tool()
+@gated("projects", writes=True)
+def idea_promote(idea_line: int, title: str, goal: str, tasks: list[str], category: str = "💻 Tech & Projects",
+                 status: str = "active", due: str = "") -> str:
+    """Turn an idea (line from ideas_list) into a project note; the idea is struck through
+    and linked to it."""
+    path = projects.promote(idea_line, title, goal, tasks, category=category, status=status, due=due)
+    activity.log("project", project=title, note="promoted from an idea")
+    return path
 
 
 # --- watchers ---------------------------------------------------------------
