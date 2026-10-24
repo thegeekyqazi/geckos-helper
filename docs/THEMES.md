@@ -4,6 +4,9 @@ Themes are Lua files that return a table of design tokens. Put yours in
 `~/.config/geckos-helper/themes/<name>.lua`; a file with the same name as a bundled
 theme replaces it. The panel updates as soon as you save.
 
+See-through themes (`glass`, `blur`) use semi-transparent colors (`alpha(c, 0.4)`); Hyprland blurs
+what's behind Gecko's panels (a layer rule `gecko end4-patch` installs).
+
 Switch themes with the palette button in the panel header (right-click goes
 back), Ctrl+T inside the panel, or `gecko theme next` / `gecko theme <name>`.
 
@@ -47,6 +50,8 @@ Themes run in a sandbox: no `io`, `os`, `require` or file access.
 | `radius`, `card_radius`, `bubble_radius` | corner rounding in pixels |
 | `font`, `mono_font`, `font_size` | `""` font means end-4's font |
 | `width`, `side` | panel width in pixels, `"left"` or `"right"` |
+| `sheen` | a light gradient over the panel (glass); `"transparent"` for none |
+| `border_width`, `shadow` | edge width in pixels; `false` turns off the drop shadow |
 | `assistant_name`, `avatar` | name and emoji shown on replies (and on the mascot) |
 | `mascot`, `mascot_corner`, `mascot_size` | desktop mascot: `"always"`, `"busy"` or `"off"`; corner like `"bottom-right"`; size in pixels |
 
