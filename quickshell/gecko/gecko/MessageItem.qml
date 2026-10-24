@@ -66,6 +66,7 @@ Item {
             thought: thoughtBlock,
             tool: toolRow,
             permission: permissionCard,
+            guard: guardCard,
             error: errorBox,
         })[root.kind] ?? null
     }
@@ -288,6 +289,14 @@ Item {
                         rel: 0.9
                     }
                 }
+                GText { // Guard warning: this chat read something that looked like an injection
+                    Layout.fillWidth: true
+                    visible: pcard.pending && root.output.length > 0
+                    text: "⚠ " + root.output
+                    color: Theme.permissionText
+                    rel: 0.8
+                    font.weight: Font.DemiBold
+                }
                 Rectangle {
                     Layout.fillWidth: true
                     visible: pcard.pending && root.inputJson !== "{}"
@@ -353,6 +362,55 @@ Item {
             font.weight: Font.DemiBold
             wrapMode: Text.NoWrap
             color: pb.primary ? Theme.permissionBg : Theme.permissionText
+        }
+    }
+
+    Component {
+        id: guardCard
+        Rectangle {
+            implicitHeight: guardCol.implicitHeight + 20
+            radius: Theme.cardRadius
+            color: Theme.errorBg
+            ColumnLayout {
+                id: guardCol
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 6
+                RowLayout {
+                    spacing: 8
+                    MaterialSymbol { text: "gpp_maybe"; iconSize: 20; color: Theme.errorText }
+                    GText {
+                        Layout.fillWidth: true
+                        text: `Possible prompt injection in ${root.title}`
+                        color: Theme.errorText
+                        font.weight: Font.DemiBold
+                        rel: 0.9
+                    }
+                }
+                GText {
+                    Layout.fillWidth: true
+                    text: `Found: ${root.text}. Gecko will treat it as data, and every action in this chat now needs your approval (saved rules are paused). Check what it read before allowing anything.`
+                    color: Theme.errorText
+                    rel: 0.8
+                }
+                RippleButton {
+                    visible: Gecko.tainted
+                    implicitHeight: 30
+                    implicitWidth: clearText.implicitWidth + 24
+                    buttonRadius: Appearance.rounding.full
+                    colBackground: Qt.alpha(Theme.errorText, 0.15)
+                    colBackgroundHover: Qt.alpha(Theme.errorText, 0.25)
+                    onClicked: Gecko.clearTaint()
+                    contentItem: GText {
+                        id: clearText
+                        anchors.centerIn: parent
+                        text: "I checked it, clear the warning"
+                        color: Theme.errorText
+                        rel: 0.8
+                        wrapMode: Text.NoWrap
+                    }
+                }
+            }
         }
     }
 
