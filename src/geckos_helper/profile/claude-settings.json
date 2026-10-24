@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gecko__todo_list",
+      "mcp__gecko__notifications_recent",
+      "mcp__gecko__system_status",
+      "mcp__gecko__media_now_playing",
+      "mcp__gecko__calendar_events",
+      "mcp__gecko__obsidian_search",
+      "mcp__gecko__obsidian_read",
+      "mcp__gecko__obsidian_open_tasks"
+    ]
+  }
+}

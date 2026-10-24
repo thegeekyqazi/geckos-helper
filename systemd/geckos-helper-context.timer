@@ -1,0 +1,10 @@
+[Unit]
+Description=Regenerate Gecko's Helper tools context daily
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target

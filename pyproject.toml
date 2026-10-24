@@ -1,0 +1,23 @@
+[project]
+name = "geckos-helper"
+version = "0.1.0"
+description = "A desktop agent for the end-4 Hyprland shell, driven by Claude Code, Codex or OpenCode"
+readme = "README.md"
+authors = [
+    { name = "thegeekyqazi", email = "geekigit@proton.me" }
+]
+requires-python = ">=3.14"
+license = "MIT"
+dependencies = [
+    "httpx>=0.28.1",
+    "icalendar>=7.3.0",
+    "mcp>=2.3.0",
+    "recurring-ical-events>=3.8.2",
+]
+
+[project.scripts]
+gecko = "geckos_helper.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"

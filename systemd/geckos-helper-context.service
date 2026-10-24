@@ -1,0 +1,6 @@
+[Unit]
+Description=Regenerate Gecko's Helper tools context
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gecko context

@@ -1,0 +1,88 @@
+# Hand-picked tools the context file reports on. Only tools that are actually
+# installed are listed for the agent. Add entries here; keep descriptions short.
+#   cmd     = executable to look for (PATH, then `paths`)
+#   paths   = extra locations to check (Quickshell's PATH is minimal)
+#   agents  = which agents can use it ("all" or a list); defaults to "all"
+
+[[tool]]
+name = "Tavily"
+cmd = "tvly"
+use = "Web search, page extraction, crawling and research (`tvly search ...`)."
+
+[[tool]]
+name = "Firecrawl"
+cmd = "firecrawl"
+use = "Web scraping/search CLI. Claude also has Firecrawl as an MCP connector."
+
+[[tool]]
+name = "GitHub CLI"
+cmd = "gh"
+use = "Repos, PRs, issues."
+
+[[tool]]
+name = "Hyprland"
+cmd = "hyprctl"
+use = "Windows, workspaces, monitors, keybinds (`hyprctl clients -j`, `hyprctl dispatch ...`)."
+
+[[tool]]
+name = "Quickshell IPC"
+cmd = "qs"
+use = "Talk to the end-4 shell: `qs -c ii ipc show` lists targets (sidebars, mpris, brightness, wallpapers...)."
+
+[[tool]]
+name = "playerctl"
+cmd = "playerctl"
+use = "Media control."
+
+[[tool]]
+name = "notify-send"
+cmd = "notify-send"
+use = "Desktop notifications (prefer the gecko `notify` tool)."
+
+[[tool]]
+name = "Clipboard"
+cmd = "wl-copy"
+use = "`wl-copy` / `wl-paste` for the Wayland clipboard; `cliphist list` for history."
+
+[[tool]]
+name = "Screenshots"
+cmd = "grim"
+use = "`grim -g \"$(slurp)\" file.png` for a region."
+
+[[tool]]
+name = "Packages"
+cmd = "dnf"
+use = "Fedora packages; needs sudo, so ask the user to run installs."
+
+[[tool]]
+name = "Flatpak"
+cmd = "flatpak"
+use = "Flatpak apps (Obsidian is md.obsidian.Obsidian)."
+
+[[tool]]
+name = "systemd"
+cmd = "systemctl"
+use = "`systemctl --user` services and timers."
+
+[[tool]]
+name = "uv"
+cmd = "uv"
+use = "Python projects and one-off scripts (`uv run`)."
+
+[[tool]]
+name = "Claude Code"
+cmd = "claude"
+paths = ["~/.local/bin/claude"]
+use = "Full coding agent; use the handoff tool instead of running it yourself."
+
+[[tool]]
+name = "Codex"
+cmd = "codex"
+paths = ["~/.npm-global/bin/codex"]
+use = "OpenAI's coding agent CLI."
+
+[[tool]]
+name = "OpenCode"
+cmd = "opencode"
+paths = ["~/.opencode/bin/opencode"]
+use = "Open-source coding agent CLI."
