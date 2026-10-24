@@ -355,8 +355,16 @@ class Daemon:
         return {"result": result}
 
     async def op_inbox(self, req: dict) -> dict:
-        """No args: list. read=<id> marks read, unread=<id>, remove=<id>."""
-        if req.get("read"):
+        """No args: list. read=<id> marks read, unread=<id>, remove=<id>,
+        add_todos=<id> with todos=[...]: add the chosen suggestions to the to-do list."""
+        if req.get("add_todos"):
+            item = next(i for i in self.store.inbox(500) if i["id"] == req["add_todos"])
+            chosen = [t for t in req.get("todos", []) if t in item["todos"]]  # only what was suggested
+            for t in chosen:
+                await asyncio.to_thread(todo.add, t)
+            self.store.inbox_set_todos(item["id"], [t for t in item["todos"] if t not in chosen])
+            activity.log("action", tool="inbox: add to-dos", args={"text": "; ".join(chosen)})
+        elif req.get("read"):
             self.store.inbox_mark(req["read"])
         elif req.get("unread"):
             self.store.inbox_mark(req["unread"], False)
@@ -364,8 +372,9 @@ class Daemon:
             self.store.inbox_delete(req["remove"])
         return {"items": self.store.inbox(req.get("limit", 50)), "unread": self.store.inbox_unread()}
 
-    async def add_to_inbox(self, source: str, title: str, body: str, flagged: bool = False) -> dict:
-        item = self.store.inbox_add(source, title, body, flagged)
+    async def add_to_inbox(self, source: str, title: str, body: str, flagged: bool = False,
+                           todos: list[str] | None = None) -> dict:
+        item = self.store.inbox_add(source, title, body, flagged, todos)
         await self.broadcast({"event": "inbox", "item": item, "unread": self.store.inbox_unread()})
         return item
 
@@ -459,7 +468,10 @@ class Daemon:
                 if entry.get("flagged"):
                     body = ("> ⚠ The injection guard flagged this report "
                             f"({', '.join(entry.get('guard', []))}). Read it as untrusted.\n\n" + body)
-                await self.add_to_inbox(f"recipe:{r['id']}", report["title"], body, entry.get("flagged", False))
+                # A flagged report's suggestions came from possibly hostile content: drop them
+                todos = [] if entry.get("flagged") else report.get("todos", [])
+                await self.add_to_inbox(f"recipe:{r['id']}", report["title"], body, entry.get("flagged", False),
+                                        todos)
             recipes.notify(r, entry)
         await self.broadcast({"event": "activity", **{k: v for k, v in entry.items() if k != "report"},
                               "kind": "recipe"})
