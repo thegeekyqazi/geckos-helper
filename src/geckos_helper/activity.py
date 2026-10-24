@@ -2,7 +2,7 @@
 
 Two append-only logs are merged for the Activity page:
     actions.jsonl   every write a desktop tool made (written by the MCP server)
-    activity.jsonl  permission decisions, watcher runs, goal updates (written by the daemon)
+    activity.jsonl  permission decisions, watcher runs, project updates (written by the daemon)
 """
 
 import json

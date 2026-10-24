@@ -18,7 +18,7 @@ from typing import Any
 from . import (activity, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
-from .desktop import calendar, goals, notes, obsidian, todo
+from .desktop import calendar, notes, obsidian, projects, todo
 from .store import Store
 
 log = logging.getLogger("gecko")
@@ -324,11 +324,13 @@ class Daemon:
         evs = await asyncio.to_thread(calendar.events, req.get("days", 7), start)
         return {"events": evs, "errors": list(calendar.last_errors), "configured": calendar.configured()}
 
-    async def op_goals(self, req: dict) -> dict:
+    async def op_projects(self, req: dict) -> dict:
+        """Projects, goals and ideas for the panel."""
         try:
-            return {"goals": await asyncio.to_thread(goals.list_goals)}
+            return {"projects": await asyncio.to_thread(projects.list_projects),
+                    "ideas": await asyncio.to_thread(projects.ideas), "vault": str(obsidian.vault())}
         except FileNotFoundError:  # no vault configured
-            return {"goals": []}
+            return {"projects": [], "ideas": [], "vault": ""}
 
     async def op_capture(self, req: dict) -> dict:
         """Capture an attachment: screenshot | window | clipboard | selection | file.
