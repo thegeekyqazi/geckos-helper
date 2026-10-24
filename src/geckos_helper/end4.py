@@ -5,33 +5,62 @@
 from . import paths
 
 QS_II = paths.HOME / ".config/quickshell/ii"
-MARK = "// gecko: reload on external change"
-
-# end-4's Todo service reads todo.json only at startup; watch it so edits made
-# by the agent show up in the widget immediately.
-TODO_QML = QS_II / "services/Todo.qml"
-TODO_ANCHOR = "        id: todoFileView\n"
-TODO_PATCH = f"        {MARK}\n        watchChanges: true\n        onFileChanged: reload()\n"
+GECKO_TOGGLE = 'Quickshell.execDetached(["qs", "-c", "gecko", "ipc", "call", "gecko", "toggle"])'
 
 
-def todo_patched() -> bool:
-    return TODO_QML.exists() and MARK in TODO_QML.read_text()
+class Patch:
+    """Replace `old` with `new` in one end-4 file; `new` carries a gecko marker."""
+
+    def __init__(self, name: str, rel: str, old: str, new: str):
+        self.name, self.file, self.old, self.new = name, QS_II / rel, old, new
+
+    def applied(self) -> bool:
+        return self.file.exists() and self.new in self.file.read_text()
+
+    def apply(self) -> bool:
+        if not self.file.exists() or self.applied():
+            return False
+        text = self.file.read_text()
+        if self.old not in text:
+            raise RuntimeError(f"{self.file} changed upstream; the '{self.name}' patch needs updating")
+        self.file.write_text(text.replace(self.old, self.new, 1))
+        return True
+
+    def revert(self) -> None:
+        if self.applied():
+            self.file.write_text(self.file.read_text().replace(self.new, self.old, 1))
+
+
+PATCHES = [
+    # end-4's Todo service reads todo.json only at startup; watch it so the agent's
+    # edits show up in the widget immediately.
+    Patch("todo watch", "services/Todo.qml", "        id: todoFileView\n",
+          "        id: todoFileView\n        // gecko: reload on external change\n"
+          "        watchChanges: true\n        onFileChanged: reload()\n"),
+    # The bar's AI button (and clicking the bar's left end) opens Gecko; right-click
+    # the button for end-4's own sidebar.
+    Patch("bar button", "modules/ii/bar/LeftSidebarButton.qml",
+          "    onPressed: {\n        GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;\n    }\n",
+          "    onPressed: { // gecko: open Gecko's Helper; right-click for end-4's sidebar\n"
+          f"        {GECKO_TOGGLE};\n    }}\n"
+          "    altAction: () => { GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen; }\n"),
+    Patch("bar button import", "modules/ii/bar/LeftSidebarButton.qml",
+          "import QtQuick\nimport qs\n", "import QtQuick\nimport Quickshell // gecko\nimport qs\n"),
+    Patch("bar left click", "modules/ii/bar/BarContent.qml",
+          "            if (event.button === Qt.LeftButton)\n"
+          "                GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;\n",
+          "            if (event.button === Qt.LeftButton) // gecko: open Gecko's Helper\n"
+          f"                {GECKO_TOGGLE};\n"),
+]
 
 
 def apply() -> list[str]:
-    done = []
-    if TODO_QML.exists() and not todo_patched():
-        text = TODO_QML.read_text()
-        if TODO_ANCHOR not in text:
-            raise RuntimeError(f"{TODO_QML} changed upstream; the to-do patch needs updating")
-        TODO_QML.write_text(text.replace(TODO_ANCHOR, TODO_ANCHOR + TODO_PATCH, 1))
-        done.append("todo watch")
-    return done
+    return [p.name for p in PATCHES if p.apply()]
 
 
 def revert() -> None:
-    if todo_patched():
-        TODO_QML.write_text(TODO_QML.read_text().replace(TODO_PATCH, "", 1))
+    for p in PATCHES:
+        p.revert()
 
 
 # Super+A opens Gecko instead of end-4's left sidebar (Super+B / Super+O still open it).
@@ -66,4 +95,5 @@ def remove_keybinds() -> None:
 
 
 def check() -> list[str]:
-    return [] if todo_patched() else ["end-4 to-do widget won't see agent edits until you run `gecko end4-patch`"]
+    missing = [p.name for p in PATCHES if p.file.exists() and not p.applied()]
+    return [f"end-4 add-ons missing ({', '.join(missing)}); run `gecko end4-patch`"] if missing else []
