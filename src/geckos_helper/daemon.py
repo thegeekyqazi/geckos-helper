@@ -15,10 +15,10 @@ import time
 from datetime import date
 from typing import Any
 
-from . import (activity, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+from . import (activity, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
-from .desktop import calendar, goals
+from .desktop import calendar, goals, notes, obsidian, todo
 from .store import Store
 
 log = logging.getLogger("gecko")
@@ -143,15 +143,17 @@ class Daemon:
         if config.load_state()["killed"]:
             raise PermissionError("Kill switch is on. Turn it off with `gecko kill off`.")
         chat = self.store.get(req["chat"]) if req.get("chat") else None
+        atts = attachments.validate(req.get("attachments"))
         if not chat:
-            title = req["text"].strip().splitlines()[0][:60] or "New chat"
+            title = (req["text"].strip().splitlines() or [""])[0][:60] or (atts[0]["name"] if atts else "New chat")
             agent = req.get("agent", "claude")
             chat = self.store.create(agent, req.get("model") or config.default_model(agent), title, req.get("cwd"))
             # nonce lets the client that sent this adopt the new chat id
             await self.broadcast({"event": "chat_created", **chat, "chat": chat["id"], "nonce": req.get("nonce")})
         backend = self.backend_for(chat)
-        await self.emitter(chat["id"])("user_message", {"text": req["text"]})
-        await backend.prompt(req["text"])
+        await self.emitter(chat["id"])("user_message", {"text": req["text"],
+                                                         "attachments": attachments.summary(atts)})
+        await backend.prompt(await asyncio.to_thread(attachments.to_content, req["text"], atts))
         self.store.update(chat["id"])
         return {"chat": chat["id"]}
 
@@ -327,6 +329,28 @@ class Daemon:
             return {"goals": await asyncio.to_thread(goals.list_goals)}
         except FileNotFoundError:  # no vault configured
             return {"goals": []}
+
+    async def op_capture(self, req: dict) -> dict:
+        """Capture an attachment: screenshot | window | clipboard | selection | file.
+        Returns {"attachment": null} if the user cancelled or there was nothing."""
+        return {"attachment": await asyncio.to_thread(attachments.capture, req["kind"])}
+
+    async def op_quick(self, req: dict) -> dict:
+        """Slash-command actions that need no agent: todo, note, idea."""
+        text = req["text"].strip()
+        if not text:
+            raise ValueError("Nothing to add")
+        action = req["action"]
+        if action == "todo":
+            result = await asyncio.to_thread(todo.add, text)
+        elif action == "note":
+            result = await asyncio.to_thread(notes.add, text)
+        elif action == "idea":
+            result = {"path": await asyncio.to_thread(obsidian.capture_idea, text)}
+        else:
+            raise ValueError(f"Unknown quick action {action!r}")
+        activity.log("action", tool=f"/{action}", args={"text": text})
+        return {"result": result}
 
     async def op_inbox(self, req: dict) -> dict:
         """No args: list. read=<id> marks read, unread=<id>, remove=<id>."""
