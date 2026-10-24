@@ -198,6 +198,16 @@ def obsidian_append(path: str, content: str) -> str:
     return obsidian.append(path, content)
 
 
+# --- past chats --------------------------------------------------------------
+
+@server.tool()
+@gated("chat_search")
+def chat_search(query: str, limit: int = 10) -> str:
+    """Search the user's past Gecko chats (keywords). Use it to recall earlier conversations."""
+    from .store import Store
+    return untrusted("past-chats", json.dumps(Store().search(query, limit), indent=1))
+
+
 # --- handoff ----------------------------------------------------------------
 
 @server.tool()

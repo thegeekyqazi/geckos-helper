@@ -9,7 +9,8 @@
       "mcp__gecko__obsidian_search",
       "mcp__gecko__obsidian_read",
       "mcp__gecko__obsidian_open_tasks",
-      "mcp__gecko__clipboard_write"
+      "mcp__gecko__clipboard_write",
+      "mcp__gecko__chat_search"
     ]
   }
 }

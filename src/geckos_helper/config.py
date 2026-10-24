@@ -47,6 +47,7 @@ CAPABILITIES: dict[str, str] = {
     "obsidian_write": "Create notes and append ideas in the vault",
     "calendar_read": "Read events from your calendar feeds",
     "handoff": "Open a full Claude Code session in a terminal",
+    "chat_search": "Search your past Gecko chats",
 }
 DEFAULT_OFF = {"clipboard_read"}
 
