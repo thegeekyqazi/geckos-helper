@@ -326,6 +326,21 @@ class Daemon:
         except FileNotFoundError:  # no vault configured
             return {"goals": []}
 
+    async def op_inbox(self, req: dict) -> dict:
+        """No args: list. read=<id> marks read, unread=<id>, remove=<id>."""
+        if req.get("read"):
+            self.store.inbox_mark(req["read"])
+        elif req.get("unread"):
+            self.store.inbox_mark(req["unread"], False)
+        elif req.get("remove"):
+            self.store.inbox_delete(req["remove"])
+        return {"items": self.store.inbox(req.get("limit", 50)), "unread": self.store.inbox_unread()}
+
+    async def add_to_inbox(self, source: str, title: str, body: str) -> dict:
+        item = self.store.inbox_add(source, title, body)
+        await self.broadcast({"event": "inbox", "item": item, "unread": self.store.inbox_unread()})
+        return item
+
     async def op_rules(self, req: dict) -> dict:
         """No args: list. match+action: add. remove=<index>: delete."""
         if "remove" in req:
