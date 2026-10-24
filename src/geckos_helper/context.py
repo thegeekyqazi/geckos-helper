@@ -14,6 +14,7 @@ import tomllib
 from datetime import datetime
 
 from . import paths, profiles
+from .desktop import notes
 from .config import expand, load_config, load_state
 
 SNAPSHOT = paths.DATA_DIR / "context.json"
@@ -101,6 +102,11 @@ def generate(refresh_mcps: bool = True) -> str:
                  ". Don't try to work around a disabled capability.")
     if new:
         lines += ["", "### New this week", ", ".join(new)]
+    widgets = ("Gecko's dots desktop widgets are installed: the desktop shows the same to-do list "
+               "and a Notes widget (`notes_*` tools); its calendar widget shows Gecko's calendar."
+               if notes.available() else
+               "No desktop widgets: to-dos show in end-4's sidebar; there are no desktop notes.")
+    lines += ["", "### Desktop widgets", widgets]
     lines += ["", "Desktop: end-4 illogical-impulse on Hyprland. Obsidian vault: "
               f"`{load_config()['desktop']['obsidian_vault']}`."]
     text = "\n".join(lines) + "\n"
