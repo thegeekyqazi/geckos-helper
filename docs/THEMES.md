@@ -50,6 +50,7 @@ Themes run in a sandbox: no `io`, `os`, `require` or file access.
 | `radius`, `card_radius`, `bubble_radius` | corner rounding in pixels |
 | `font`, `mono_font`, `font_size` | `""` font means end-4's font |
 | `width`, `side` | panel width in pixels, `"left"` or `"right"` |
+| `popup` | menus and the / palette (keep it nearly opaque in see-through themes) |
 | `sheen` | a light gradient over the panel (glass); `"transparent"` for none |
 | `border_width`, `shadow` | edge width in pixels; `false` turns off the drop shadow |
 | `assistant_name`, `avatar` | name and emoji shown on replies (and on the mascot) |

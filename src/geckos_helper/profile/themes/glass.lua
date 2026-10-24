@@ -3,7 +3,8 @@
 local t = default()
 local light = "#ffffff"
 local ink   = "#10121a"
-t.bg            = alpha(mix(ink, palette.primary_container, 0.18), 0.52)
+t.bg            = alpha(mix(ink, palette.primary_container, 0.18), 0.62)
+t.popup         = alpha(mix(ink, palette.primary_container, 0.2), 0.96)
 t.surface       = alpha(light, 0.08)
 t.surface_high  = alpha(light, 0.14)
 t.border        = alpha(light, 0.28)
