@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS entries (
     chat_id TEXT, ts REAL, kind TEXT, data TEXT
 );
 CREATE INDEX IF NOT EXISTS entries_chat ON entries(chat_id, ts);
+CREATE TABLE IF NOT EXISTS inbox (
+    id TEXT PRIMARY KEY, ts REAL, source TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(chat_id UNINDEXED, kind UNINDEXED, text);
 """
 
@@ -81,6 +84,30 @@ class Store:
         self.db.execute("INSERT INTO entries VALUES (?,?,?,?)", (chat_id, time.time(), kind, json.dumps(data)))
         if kind in SEARCHABLE_KINDS:
             self.db.execute("INSERT INTO entries_fts VALUES (?,?,?)", (chat_id, kind, data.get("text", "")))
+        self.db.commit()
+
+    # --- inbox: reports from recipes (daily briefing etc.) ------------------
+
+    def inbox_add(self, source: str, title: str, body: str) -> dict:
+        item = {"id": uuid.uuid4().hex[:12], "ts": time.time(), "source": source, "title": title,
+                "body": body, "read": 0}
+        self.db.execute("INSERT INTO inbox VALUES (:id,:ts,:source,:title,:body,:read)", item)
+        self.db.commit()
+        return item
+
+    def inbox(self, limit: int = 50) -> list[dict]:
+        rows = self.db.execute("SELECT * FROM inbox ORDER BY ts DESC LIMIT ?", (limit,))
+        return [dict(r) for r in rows]
+
+    def inbox_unread(self) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM inbox WHERE read=0").fetchone()[0]
+
+    def inbox_mark(self, item_id: str, read: bool = True) -> None:
+        self.db.execute("UPDATE inbox SET read=? WHERE id=?", (int(read), item_id))
+        self.db.commit()
+
+    def inbox_delete(self, item_id: str) -> None:
+        self.db.execute("DELETE FROM inbox WHERE id=?", (item_id,))
         self.db.commit()
 
     def search(self, query: str, limit: int = 20) -> list[dict]:
