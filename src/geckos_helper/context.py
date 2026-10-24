@@ -31,6 +31,8 @@ def installed_tools() -> list[dict]:
     spec = tomllib.loads((paths.PROFILE_DIR / "tools.toml").read_text())
     out = []
     for t in spec["tool"]:
+        if t.get("check_config") and not (paths.HOME / ".config/quickshell" / t["check_config"]).exists():
+            continue  # a Quickshell config that isn't installed
         if where := _find(t["cmd"], t.get("paths", [])):
             out.append({"name": t["name"], "cmd": where if t.get("paths") else t["cmd"], "use": t["use"]})
     return out

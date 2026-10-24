@@ -3,6 +3,7 @@
 #   cmd     = executable to look for (PATH, then `paths`)
 #   paths   = extra locations to check (Quickshell's PATH is minimal)
 #   agents  = which agents can use it ("all" or a list); defaults to "all"
+#   check_config = only list it when ~/.config/quickshell/<name> exists
 
 [[tool]]
 name = "Tavily"
@@ -86,3 +87,9 @@ name = "OpenCode"
 cmd = "opencode"
 paths = ["~/.opencode/bin/opencode"]
 use = "Open-source coding agent CLI."
+
+[[tool]]
+name = "Now Playing widgets"
+cmd = "qs"
+check_config = "nowplaying"
+use = "Music card/island: `qs -c nowplaying ipc call nowplaying <playPause|next|previous|toggleIsland|toggleCard|toggleLyrics|setStyle bars|wave>`."
