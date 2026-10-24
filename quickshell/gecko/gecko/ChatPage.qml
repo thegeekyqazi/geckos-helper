@@ -4,28 +4,54 @@ import QtQuick.Layouts
 import qs.modules.common
 import qs.modules.common.widgets
 
-ColumnLayout {
+Item {
     id: root
-    spacing: 8
 
     function focusInput() {
         input.forceActiveFocus();
     }
 
-    Item {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
+    function submit() {
+        if (Gecko.busy || !input.text.trim().length) return;
+        Gecko.send(input.text);
+        input.text = "";
+    }
+
+    // Typing dots while the agent works but hasn't started writing yet
+    readonly property bool waiting: {
+        if (!Gecko.busy || Gecko.messages.count === 0) return false;
+        const last = Gecko.messages.get(Gecko.messages.count - 1);
+        return !(last.kind === "agent" && last.streaming) && last.permState !== "pending";
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
 
         StyledListView {
             id: list
-            anchors.fill: parent
-            spacing: 8
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            leftMargin: 14
+            rightMargin: 14
+            topMargin: 8
+            bottomMargin: 8
+            spacing: 14
             clip: true
             popin: false
             add: null
             model: Gecko.messages
             delegate: MessageItem {
-                width: list.width
+                width: list.width - list.leftMargin - list.rightMargin
+            }
+            footer: Item {
+                width: list.width - list.leftMargin - list.rightMargin
+                implicitHeight: root.waiting ? 34 : 0
+                TypingDots {
+                    visible: root.waiting
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                }
             }
 
             Connections {
@@ -36,52 +62,97 @@ ColumnLayout {
             }
         }
 
-        ColumnLayout { // Empty state with a few starters
-            anchors.centerIn: parent
-            width: parent.width - 20
-            visible: Gecko.messages.count === 0
-            spacing: 10
+        Rectangle { // Composer
+            Layout.fillWidth: true
+            Layout.margins: 10
+            implicitHeight: composerColumn.implicitHeight + 16
+            radius: Theme.radius
+            color: Theme.composerBg
+            border.width: 1
+            border.color: input.activeFocus ? Qt.alpha(Theme.accent, 0.6) : Theme.border
 
-            MaterialSymbol {
-                Layout.alignment: Qt.AlignHCenter
-                text: "pest_control_rodent"
-                iconSize: 56
-                color: Appearance.colors.colPrimary
-            }
-            StyledText {
-                Layout.alignment: Qt.AlignHCenter
-                text: "What can I do for you?"
-                font.pixelSize: Appearance.font.pixelSize.larger
-                color: Appearance.colors.colOnLayer0
-            }
-            Flow {
-                Layout.fillWidth: true
-                spacing: 6
-                Repeater {
-                    model: ["What's on my calendar today?", "What's due this week?",
-                            "Summarize my notifications", "Capture an idea"]
-                    delegate: RippleButton {
-                        id: starter
-                        required property string modelData
-                        implicitHeight: 32
-                        implicitWidth: starterText.implicitWidth + 24
-                        buttonRadius: Appearance.rounding.full
-                        colBackground: Appearance.colors.colLayer2
-                        onClicked: {
-                            if (modelData === "Capture an idea") {
-                                input.text = "Capture this idea in my vault: ";
-                                input.cursorPosition = input.text.length;
-                                input.forceActiveFocus();
-                            } else {
-                                Gecko.send(modelData);
+            Behavior on border.color { ColorAnimation { duration: 150 } }
+
+            ColumnLayout {
+                id: composerColumn
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 4
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(180, Math.max(28, input.implicitHeight))
+                    StyledTextArea {
+                        id: input
+                        wrapMode: TextArea.Wrap
+                        leftPadding: 8
+                        rightPadding: 8
+                        topPadding: 6
+                        bottomPadding: 6
+                        background: null
+                        font.family: Theme.font
+                        font.pixelSize: Theme.fontSize
+                        color: Theme.text
+                        placeholderTextColor: Theme.textMuted
+                        enabled: Gecko.connected && !Gecko.killed
+                        placeholderText: Gecko.killed ? "Kill switch is on" : `Message ${Theme.assistantName}…`
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                    && !(event.modifiers & Qt.ShiftModifier)) {
+                                root.submit();
+                                event.accepted = true;
                             }
                         }
-                        contentItem: StyledText {
-                            id: starterText
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    RippleButton { // Model picker
+                        implicitHeight: 30
+                        implicitWidth: modelRow.implicitWidth + 18
+                        buttonRadius: Appearance.rounding.full
+                        colBackground: "transparent"
+                        colBackgroundHover: Theme.surfaceHigh
+                        colRipple: Theme.border
+                        onClicked: modelMenu.shown = !modelMenu.shown
+                        contentItem: Item {
+                            RowLayout {
+                                id: modelRow
+                                anchors.centerIn: parent
+                                spacing: 2
+                                GText {
+                                    text: (Gecko.chatModel || Gecko.defaultModel || "model")
+                                        .replace(/^./, c => c.toUpperCase())
+                                    muted: true
+                                    rel: 0.85
+                                    wrapMode: Text.NoWrap
+                                }
+                                MaterialSymbol { text: "expand_more"; color: Theme.textMuted; iconSize: 16 }
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    RippleButton { // Send / stop
+                        implicitWidth: 34
+                        implicitHeight: 34
+                        buttonRadius: Appearance.rounding.full
+                        readonly property bool active: Gecko.busy || input.text.trim().length > 0
+                        colBackground: active ? Theme.accent : Theme.surfaceHigh
+                        colBackgroundHover: active ? Qt.lighter(Theme.accent, 1.1) : Theme.surfaceHigh
+                        colRipple: Theme.border
+                        onClicked: Gecko.busy ? Gecko.stop() : root.submit()
+                        contentItem: MaterialSymbol {
                             anchors.centerIn: parent
-                            text: starter.modelData
-                            font.pixelSize: Appearance.font.pixelSize.smaller
-                            color: Appearance.colors.colOnLayer2
+                            horizontalAlignment: Text.AlignHCenter
+                            text: Gecko.busy ? "stop" : "arrow_upward"
+                            fill: 1
+                            iconSize: 20
+                            color: parent.active ? Theme.accentText : Theme.textMuted
                         }
                     }
                 }
@@ -89,62 +160,125 @@ ColumnLayout {
         }
     }
 
-    Rectangle { // Input box
-        Layout.fillWidth: true
-        implicitHeight: Math.min(200, Math.max(48, input.implicitHeight + 8))
-        radius: Appearance.rounding.normal
-        color: Appearance.colors.colLayer2
-        border.width: input.activeFocus ? 2 : 0
-        border.color: Appearance.colors.colPrimary
+    EmptyState {
+        onPrefill: text => {
+            input.text = text;
+            input.cursorPosition = text.length;
+            input.forceActiveFocus();
+        }
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: -40
+        anchors.margins: 20
+        visible: Gecko.messages.count === 0
+    }
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.rightMargin: 6
-            spacing: 4
+    ModelMenu {
+        id: modelMenu
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 14
+        anchors.bottomMargin: 66
+    }
 
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                StyledTextArea {
-                    id: input
-                    wrapMode: TextArea.Wrap
-                    padding: 12
-                    background: null
-                    enabled: Gecko.connected && !Gecko.killed
-                    placeholderText: Gecko.killed ? "Kill switch is on" : "Ask Gecko…  (Shift+Enter for a new line)"
-                    Keys.onPressed: event => {
-                        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                                && !(event.modifiers & Qt.ShiftModifier)) {
-                            if (!Gecko.busy) {
-                                Gecko.send(input.text);
-                                input.text = "";
-                            }
-                            event.accepted = true;
-                        }
-                    }
+    component TypingDots: Row {
+        spacing: 5
+        Repeater {
+            model: 3
+            delegate: Rectangle {
+                required property int index
+                width: 7
+                height: 7
+                radius: 4
+                color: Theme.textMuted
+                SequentialAnimation on opacity {
+                    running: root.waiting
+                    loops: Animation.Infinite
+                    PauseAnimation { duration: index * 160 }
+                    NumberAnimation { from: 0.25; to: 1; duration: 320 }
+                    NumberAnimation { from: 1; to: 0.25; duration: 320 }
+                    PauseAnimation { duration: (2 - index) * 160 }
                 }
             }
+        }
+    }
 
-            RippleButton {
-                implicitWidth: 38
-                implicitHeight: 38
-                buttonRadius: Appearance.rounding.full
-                toggled: true
-                enabled: Gecko.busy || input.text.trim().length > 0
-                onClicked: {
-                    if (Gecko.busy) {
-                        Gecko.stop();
-                    } else {
-                        Gecko.send(input.text);
-                        input.text = "";
-                    }
+    component EmptyState: ColumnLayout {
+        id: empty
+        signal prefill(string text)
+        spacing: 18
+
+        ColumnLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 4
+            GText {
+                Layout.alignment: Qt.AlignHCenter
+                text: Theme.avatar
+                rel: 2.6
+            }
+            GText {
+                Layout.alignment: Qt.AlignHCenter
+                horizontalAlignment: Text.AlignHCenter
+                text: {
+                    const h = new Date().getHours();
+                    return h < 5 ? "Up late?" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
                 }
-                contentItem: MaterialSymbol {
-                    anchors.centerIn: parent
-                    horizontalAlignment: Text.AlignHCenter
-                    text: Gecko.busy ? "stop" : "arrow_upward"
-                    iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.colors.colOnPrimary
+                rel: 1.7
+                font.weight: Font.DemiBold
+            }
+            GText {
+                Layout.alignment: Qt.AlignHCenter
+                text: "How can I help?"
+                muted: true
+            }
+        }
+
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 2
+            rowSpacing: 8
+            columnSpacing: 8
+            Repeater {
+                model: [
+                    ["calendar_month", "What's on today?", "What's on my calendar today?"],
+                    ["assignment_late", "What's due soon?", "What's due this week, from my calendar and Obsidian tasks?"],
+                    ["notifications", "Catch me up", "Summarize my recent notifications."],
+                    ["lightbulb", "Capture an idea", ""],
+                ]
+                delegate: RippleButton {
+                    id: card
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 64
+                    buttonRadius: Theme.cardRadius
+                    colBackground: Theme.surface
+                    colBackgroundHover: Theme.surfaceHigh
+                    colRipple: Theme.border
+                    onClicked: {
+                        if (modelData[2]) {
+                            Gecko.send(modelData[2]);
+                        } else {
+                            empty.prefill("Capture this idea in my vault: ");
+                        }
+                    }
+                    contentItem: ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 2
+                        MaterialSymbol {
+                            text: card.modelData[0]
+                            iconSize: 20
+                            color: Theme.accent
+                        }
+                        GText {
+                            Layout.fillWidth: true
+                            text: card.modelData[1]
+                            rel: 0.87
+                            elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
+                        }
+                    }
                 }
             }
         }
