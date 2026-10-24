@@ -4,7 +4,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 
 /**
- * Audit trail: scheduled watchers and goals first, then everything Gecko did,
+ * Audit trail: watchers and recipes first, then everything Gecko did,
  * newest first, with who decided each permission.
  */
 StyledFlickable {
@@ -44,7 +44,8 @@ StyledFlickable {
         case "budget":
             return { icon: "hourglass_top", title: "Background work paused", detail: e.reason };
         case "goal":
-            return { icon: "flag", title: `${e.goal}: ${e.note}`, detail: "goal update" };
+        case "project":
+            return { icon: "folder_special", title: `${e.project ?? e.goal}: ${e.note}`, detail: "project update" };
         }
         return { icon: "info", title: e.kind, detail: "" };
     }
@@ -124,42 +125,6 @@ StyledFlickable {
             text: "Edit or add recipes in ~/.config/geckos-helper/recipes/ (TOML), or ask Gecko to make one."
             muted: true
             rel: 0.7
-        }
-
-        Section { text: "Goals"; visible: Gecko.goals.length > 0 }
-        Repeater {
-            model: Gecko.goals
-            delegate: ColumnLayout {
-                id: goalRow
-                required property var modelData
-                Layout.fillWidth: true
-                Layout.bottomMargin: 6
-                spacing: 4
-                RowLayout {
-                    Layout.fillWidth: true
-                    GText { Layout.fillWidth: true; text: goalRow.modelData.title; rel: 0.93; elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                    GText { text: `${goalRow.modelData.done}/${goalRow.modelData.total}`; muted: true; rel: 0.8 }
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 6
-                    radius: 3
-                    color: Theme.surfaceHigh
-                    Rectangle {
-                        width: parent.width * (goalRow.modelData.total ? goalRow.modelData.done / goalRow.modelData.total : 0)
-                        height: parent.height
-                        radius: 3
-                        color: Theme.accent
-                    }
-                }
-                GText {
-                    Layout.fillWidth: true
-                    visible: (goalRow.modelData.next ?? "").length > 0
-                    text: `Next: ${goalRow.modelData.next}`
-                    muted: true
-                    rel: 0.8
-                }
-            }
         }
 
         Section { text: "Recent" }

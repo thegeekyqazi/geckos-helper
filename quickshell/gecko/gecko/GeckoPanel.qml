@@ -109,7 +109,7 @@ PanelWindow {
             StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: ["chat", "history", "settings", "activity", "memory", "calendar", "inbox"].indexOf(Gecko.page)
+                currentIndex: ["chat", "history", "settings", "activity", "memory", "calendar", "inbox", "projects"].indexOf(Gecko.page)
 
                 ChatPage { id: chatPage }
                 HistoryPage {}
@@ -118,6 +118,7 @@ PanelWindow {
                 MemoryPage {}
                 CalendarPage {}
                 InboxPage {}
+                ProjectsPage {}
             }
         }
 
@@ -183,6 +184,7 @@ PanelWindow {
                         : Gecko.page === "memory" ? "Memory"
                         : Gecko.page === "calendar" ? "Calendar"
                         : Gecko.page === "inbox" ? "Inbox"
+                        : Gecko.page === "projects" ? "Projects"
                         : (Gecko.chatTitle || "New chat")
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight

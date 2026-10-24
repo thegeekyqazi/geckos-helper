@@ -359,6 +359,8 @@ Singleton {
         { name: "history", arg: "", desc: "Open chat history", run: a => { root.refreshChats(); root.page = "history"; } },
         { name: "activity", arg: "", desc: "What Gecko did, watchers, recipes", run: a => root.page = "activity" },
         { name: "memory", arg: "", desc: "What Gecko remembers", run: a => root.page = "memory" },
+        { name: "projects", arg: "", desc: "Projects, goals and ideas", run: a => root.page = "projects" },
+        { name: "next", arg: "", desc: "What should I work on next?", run: a => root.send("What should I work on next across my projects, given my calendar and deadlines? Suggest a few to-dos.") },
         { name: "settings", arg: "", desc: "Capabilities and rules", run: a => root.page = "settings" },
         { name: "kill", arg: "", desc: "Toggle the kill switch", run: a => root.setKilled(!root.killed) },
     ]
@@ -481,6 +483,13 @@ Singleton {
     function markRead(id) {
         root.call("inbox", { read: id }, r => { root.inboxItems = r.items; root.inboxUnread = r.unread; });
     }
+    function addSuggestedTodos(id, todos) {
+        root.call("inbox", { add_todos: id, todos: todos }, r => {
+            root.inboxItems = r.items;
+            root.inboxUnread = r.unread;
+            root.showToast(`Added ${todos.length} to-do${todos.length === 1 ? "" : "s"}`);
+        });
+    }
     function deleteInboxItem(id) {
         root.call("inbox", { remove: id }, r => { root.inboxItems = r.items; root.inboxUnread = r.unread; });
     }
@@ -493,11 +502,15 @@ Singleton {
 
     property var activity: []
     property var watchers: []
-    property var goals: []
+    property var projects: []
+    property var ideas: []
+    property string vaultPath: ""
+    function refreshProjects() {
+        root.call("projects", {}, r => { root.projects = r.projects; root.ideas = r.ideas; root.vaultPath = r.vault; });
+    }
     function refreshActivity() {
         root.call("activity", { limit: 150 }, r => root.activity = r.entries);
         root.call("watchers", {}, r => root.watchers = r.watchers);
-        root.call("goals", {}, r => root.goals = r.goals);
         root.call("recipes", {}, r => root.recipes = r.recipes);
     }
     function deleteWatcher(id) {

@@ -72,9 +72,15 @@ Rectangle {
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.margins: 4 }
         MenuItem {
+            iconName: "folder_special"
+            label: "Projects"
+            hint: "Projects, goals and ideas from your vault"
+            onClicked: { Gecko.page = "projects"; root.shown = false; }
+        }
+        MenuItem {
             iconName: "timeline"
             label: "Activity"
-            hint: "What Gecko did, watchers, goals"
+            hint: "What Gecko did, watchers, recipes"
             onClicked: { Gecko.page = "activity"; root.shown = false; }
         }
         MenuItem {
