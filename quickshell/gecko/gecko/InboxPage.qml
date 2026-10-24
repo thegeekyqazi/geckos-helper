@@ -87,6 +87,42 @@ StyledFlickable {
                         rel: 0.88
                         onLinkActivated: link => Qt.openUrlExternally(link)
                     }
+                    ColumnLayout { // Suggested to-dos: tick and add with one click
+                        id: suggestions
+                        Layout.fillWidth: true
+                        Layout.topMargin: 6
+                        visible: card.expanded && card.modelData.todos.length > 0
+                        spacing: 2
+                        property var picked: card.modelData.todos.slice()
+                        GText { text: "Suggested to-dos"; muted: true; rel: 0.75; font.weight: Font.DemiBold }
+                        Repeater {
+                            model: card.modelData.todos
+                            delegate: RowLayout {
+                                id: sugRow
+                                required property string modelData
+                                Layout.fillWidth: true
+                                spacing: 6
+                                readonly property bool checked: suggestions.picked.includes(modelData)
+                                MaterialSymbol {
+                                    text: sugRow.checked ? "check_box" : "check_box_outline_blank"
+                                    fill: sugRow.checked ? 1 : 0
+                                    iconSize: 18
+                                    color: sugRow.checked ? Theme.accent : Theme.textMuted
+                                }
+                                GText { Layout.fillWidth: true; text: sugRow.modelData; rel: 0.85 }
+                                TapHandler {
+                                    onTapped: suggestions.picked = sugRow.checked
+                                        ? suggestions.picked.filter(t => t !== sugRow.modelData)
+                                        : [...suggestions.picked, sugRow.modelData]
+                                }
+                            }
+                        }
+                        DialogButton {
+                            buttonText: `Add ${suggestions.picked.length} to to-dos`
+                            enabled: suggestions.picked.length > 0
+                            onClicked: Gecko.addSuggestedTodos(card.modelData.id, suggestions.picked)
+                        }
+                    }
                     RowLayout {
                         visible: card.expanded
                         spacing: 4
