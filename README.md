@@ -13,8 +13,13 @@ vault, media and system info.
 
 `qs -c gecko`, a separate Quickshell config that reuses end-4's own widgets and
 wallpaper colors through symlinks, so it looks native but end-4 updates never
-overwrite it. It replaces end-4's left sidebar on **Super+A** (Super+B / Super+O
-still open end-4's).
+overwrite it. It replaces end-4's left sidebar on **Super+A** and on the bar's ✦ AI
+button (right-click the button, or Super+B / Super+O, for end-4's own sidebar).
+
+Works with the desktop widgets from [Gecko's dots](https://github.com/thegeekyqazi/geckos-dots):
+the to-do and notes widgets share Gecko's files, and the calendar widget reads the
+shared feed `~/.local/state/geckos-helper/calendar.json` (refreshed every 10 minutes)
+to show your events.
 
 - Streaming replies with markdown, collapsible tool cards, "thinking" blocks
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**
