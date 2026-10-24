@@ -282,6 +282,7 @@ Singleton {
             root.capabilityDescriptions = r.capability_descriptions;
             if (r.usage) root.usage = r.usage;
             root.budget = r.budget ?? {};
+            root.features = r.features ?? {};
         });
     }
 
@@ -346,7 +347,7 @@ Singleton {
         { name: "selection", arg: "", desc: "Attach the selected text", run: a => root.capture("selection") },
         { name: "file", arg: "", desc: "Attach a file", run: a => root.capture("file") },
         { name: "todo", arg: "text", desc: "Add a to-do (instant, no AI)", run: a => root.quick("todo", a, "Added to your to-dos") },
-        { name: "note", arg: "text", desc: "Pin a desktop note (instant)", run: a => root.quick("note", a, "Pinned to your desktop notes") },
+        { name: "note", arg: "text", desc: "Pin a desktop note (instant)", requires: "desktop_notes", run: a => root.quick("note", a, "Pinned to your desktop notes") },
         { name: "idea", arg: "text", desc: "Capture an idea in your vault (instant)", run: a => root.quick("idea", a, "Saved to your Gecko inbox note") },
         { name: "remember", arg: "fact", desc: "Tell Gecko something to remember", run: a => root.send(`Remember this about me: ${a}`) },
         { name: "model", arg: "sonnet|opus|haiku", desc: "Switch this chat's model", run: a => { root.setModel(a); root.showToast(`Model: ${a}`); } },
@@ -365,17 +366,21 @@ Singleton {
         { name: "kill", arg: "", desc: "Toggle the kill switch", run: a => root.setKilled(!root.killed) },
     ]
 
+    // Optional features from the daemon (e.g. desktop notes need Gecko's dots)
+    property var features: ({})
+    readonly property var availableCommands: root.commands.filter(c => !c.requires || root.features[c.requires])
+
     function matchCommands(text) {
         if (!text.startsWith("/")) return [];
         const word = text.slice(1).split(" ")[0].toLowerCase();
-        if (text.includes(" ")) return root.commands.filter(c => c.name === word);
-        return root.commands.filter(c => c.name.startsWith(word));
+        if (text.includes(" ")) return root.availableCommands.filter(c => c.name === word);
+        return root.availableCommands.filter(c => c.name.startsWith(word));
     }
 
     // Run "/name arg". Returns false if it isn't a known command.
     function runCommand(text) {
         const m = text.trim().match(/^\/(\S+)\s*([\s\S]*)$/);
-        const cmd = m && root.commands.find(c => c.name === m[1].toLowerCase());
+        const cmd = m && root.availableCommands.find(c => c.name === m[1].toLowerCase());
         if (!cmd) return false;
         if (cmd.arg && !cmd.arg.startsWith("[") && !m[2].trim()) {
             root.showToast(`/${cmd.name} needs ${cmd.arg}`);
