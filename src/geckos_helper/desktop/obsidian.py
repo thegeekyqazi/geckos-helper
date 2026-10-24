@@ -76,6 +76,10 @@ def append(rel: str, content: str) -> str:
 
 def capture_idea(text: str, tags: list[str] | None = None) -> str:
     inbox = load_config()["desktop"]["obsidian_inbox"]
+    note = _resolve(inbox if inbox.endswith(".md") else inbox + ".md")
+    if not note.exists():  # start the ideas note in the vault's style
+        note.parent.mkdir(parents=True, exist_ok=True)
+        note.write_text("# 💡 Ideas\n\n> Captured with /idea or by Gecko. Start one from the Projects page.\n\n")
     tag_str = " ".join(f"#{t.lstrip('#')}" for t in tags or [])
     return append(inbox, f"- {date.today().isoformat()} {text} {tag_str}".rstrip())
 
