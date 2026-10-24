@@ -12,11 +12,12 @@ import json
 import logging
 import os
 import time
+from datetime import date
 from typing import Any
 
 from . import activity, config, context, handoff_export, memory, paths, rules, theme, watchers
 from .backends.claude import ClaudeBackend
-from .desktop import goals
+from .desktop import calendar, goals
 from .store import Store
 
 log = logging.getLogger("gecko")
@@ -255,6 +256,12 @@ class Daemon:
             w = next(w for w in watchers.load() if w["id"] == req["run"])
             asyncio.create_task(self.run_watcher(w))
         return {"watchers": [watchers.describe(w) for w in watchers.load()]}
+
+    async def op_calendar(self, req: dict) -> dict:
+        """Events for the panel's calendar view: days from start (YYYY-MM-DD, default today)."""
+        start = date.fromisoformat(req["start"]) if req.get("start") else None
+        evs = await asyncio.to_thread(calendar.events, req.get("days", 7), start)
+        return {"events": evs, "errors": list(calendar.last_errors), "configured": calendar.configured()}
 
     async def op_goals(self, req: dict) -> dict:
         try:
