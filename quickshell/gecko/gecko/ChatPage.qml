@@ -12,9 +12,25 @@ Item {
     }
 
     function submit() {
-        if (Gecko.busy || !input.text.trim().length) return;
+        if (Gecko.busy || (!input.text.trim().length && !Gecko.attachments.length)) return;
         Gecko.send(input.text);
         input.text = "";
+    }
+
+    // Slash-command palette state
+    readonly property var matches: Gecko.matchCommands(input.text)
+    readonly property bool paletteOpen: matches.length > 0 && input.activeFocus
+    property int paletteIndex: 0
+    onMatchesChanged: paletteIndex = 0
+
+    function completeCommand(cmd) {
+        if (cmd.arg && !cmd.arg.startsWith("[")) {
+            input.text = `/${cmd.name} `;
+            input.cursorPosition = input.text.length;
+        } else {
+            input.text = "";
+            cmd.run("");
+        }
     }
 
     // Typing dots while the agent works but hasn't started writing yet
@@ -72,6 +88,7 @@ Item {
         }
 
         Rectangle { // Composer
+            id: composer
             Layout.fillWidth: true
             Layout.margins: 10
             implicitHeight: composerColumn.implicitHeight + 16
@@ -87,6 +104,27 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 4
+
+                Flow { // Pending attachments
+                    Layout.fillWidth: true
+                    visible: Gecko.attachments.length > 0 || Gecko.capturing
+                    spacing: 6
+                    Repeater {
+                        model: Gecko.attachments
+                        delegate: AttachmentChip {
+                            required property var modelData
+                            required property int index
+                            attachment: modelData
+                            onRemoved: Gecko.removeAttachment(index)
+                        }
+                    }
+                    GText {
+                        visible: Gecko.capturing
+                        text: "Capturing…"
+                        muted: true
+                        rel: 0.8
+                    }
+                }
 
                 ScrollView {
                     Layout.fillWidth: true
@@ -104,8 +142,19 @@ Item {
                         color: Theme.text
                         placeholderTextColor: Theme.textMuted
                         enabled: Gecko.connected && !Gecko.killed
-                        placeholderText: Gecko.killed ? "Kill switch is on" : `Message ${Theme.assistantName}…`
+                        placeholderText: Gecko.killed ? "Kill switch is on" : `Message ${Theme.assistantName}…  (/ for commands)`
                         Keys.onPressed: event => {
+                            if (root.paletteOpen) {
+                                const n = root.matches.length;
+                                if (event.key === Qt.Key_Down) { root.paletteIndex = (root.paletteIndex + 1) % n; event.accepted = true; return; }
+                                if (event.key === Qt.Key_Up) { root.paletteIndex = (root.paletteIndex + n - 1) % n; event.accepted = true; return; }
+                                if (event.key === Qt.Key_Tab) { root.completeCommand(root.matches[root.paletteIndex]); event.accepted = true; return; }
+                                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !input.text.includes(" ")) {
+                                    root.completeCommand(root.matches[root.paletteIndex]);
+                                    event.accepted = true;
+                                    return;
+                                }
+                            }
                             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                                     && !(event.modifiers & Qt.ShiftModifier)) {
                                 root.submit();
@@ -118,6 +167,13 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 4
+
+                    IconButton { // Attach
+                        size: 30
+                        iconName: "add"
+                        tip: "Attach (or type /)"
+                        onClicked: attachMenu.shown = !attachMenu.shown
+                    }
 
                     RippleButton { // Model picker
                         implicitHeight: 30
@@ -150,7 +206,7 @@ Item {
                         implicitWidth: 34
                         implicitHeight: 34
                         buttonRadius: Appearance.rounding.full
-                        readonly property bool active: Gecko.busy || input.text.trim().length > 0
+                        readonly property bool active: Gecko.busy || input.text.trim().length > 0 || Gecko.attachments.length > 0
                         colBackground: active ? Theme.accent : Theme.surfaceHigh
                         colBackgroundHover: active ? Qt.lighter(Theme.accent, 1.1) : Theme.surfaceHigh
                         colRipple: Theme.border
@@ -183,12 +239,127 @@ Item {
         visible: Gecko.messages.count === 0
     }
 
+    Rectangle { // Attach menu
+        id: attachMenu
+        property bool shown: false
+        visible: shown
+        z: 10
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 14
+        anchors.bottomMargin: composer.height + 16
+        implicitWidth: 230
+        implicitHeight: attachCol.implicitHeight + 12
+        radius: Theme.cardRadius
+        color: Theme.surfaceHigh
+        border.width: 1
+        border.color: Theme.border
+        ColumnLayout {
+            id: attachCol
+            anchors.fill: parent
+            anchors.margins: 6
+            spacing: 0
+            Repeater {
+                model: [["screenshot", "screenshot_region", "Screenshot a region"],
+                        ["window", "web_asset", "Focused window"],
+                        ["clipboard", "content_paste", "Clipboard"],
+                        ["selection", "text_select_start", "Selected text"],
+                        ["file", "attach_file", "File…"]]
+                delegate: RippleButton {
+                    id: attachItem
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 36
+                    buttonRadius: Theme.cardRadius - 4
+                    colBackground: "transparent"
+                    colBackgroundHover: Theme.surface
+                    colRipple: Theme.border
+                    onClicked: { attachMenu.shown = false; Gecko.capture(modelData[0]); }
+                    contentItem: RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        spacing: 10
+                        MaterialSymbol { text: attachItem.modelData[1]; iconSize: 18; color: Theme.textMuted }
+                        GText { Layout.fillWidth: true; text: attachItem.modelData[2]; rel: 0.9 }
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle { // Slash-command palette
+        visible: root.paletteOpen
+        z: 11
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
+        anchors.bottomMargin: composer.height + 16
+        implicitHeight: Math.min(paletteList.contentHeight + 12, 320)
+        radius: Theme.cardRadius
+        color: Theme.surfaceHigh
+        border.width: 1
+        border.color: Theme.border
+        ListView {
+            id: paletteList
+            anchors.fill: parent
+            anchors.margins: 6
+            clip: true
+            model: root.matches
+            currentIndex: root.paletteIndex
+            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+            delegate: Rectangle {
+                id: cmdRow
+                required property var modelData
+                required property int index
+                width: paletteList.width
+                implicitHeight: 34
+                radius: Theme.cardRadius - 6
+                color: index === root.paletteIndex ? Theme.surface : "transparent"
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 8
+                    GText {
+                        text: `/${cmdRow.modelData.name}`
+                        font.family: Theme.monoFont
+                        rel: 0.85
+                        color: Theme.accent
+                        wrapMode: Text.NoWrap
+                    }
+                    GText {
+                        visible: cmdRow.modelData.arg.length > 0
+                        text: cmdRow.modelData.arg
+                        muted: true
+                        rel: 0.75
+                        wrapMode: Text.NoWrap
+                    }
+                    GText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignRight
+                        text: cmdRow.modelData.desc
+                        muted: true
+                        rel: 0.75
+                        elide: Text.ElideRight
+                        wrapMode: Text.NoWrap
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.completeCommand(cmdRow.modelData)
+                }
+            }
+        }
+    }
+
     ModelMenu {
         id: modelMenu
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: 14
-        anchors.bottomMargin: 66
+        anchors.bottomMargin: composer.height + 16
     }
 
     component TypingDots: Row {
