@@ -110,6 +110,9 @@ Singleton {
         case "usage":
             root.usage = ev;
             return;
+        case "activity":
+            if (root.page === "activity") root.refreshActivity();
+            return;
         case "chat_updated":
             if (ev.chat === root.chatId && ev.model) root.chatModel = ev.model;
             return;

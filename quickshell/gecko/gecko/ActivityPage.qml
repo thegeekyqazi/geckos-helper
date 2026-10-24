@@ -57,11 +57,17 @@ StyledFlickable {
                 required property var modelData
                 Layout.fillWidth: true
                 Entry {
-                    width: column.width - 32
+                    width: column.width - 64
                     iconName: watchRow.modelData.paused ? "pause_circle" : "visibility"
                     title: watchRow.modelData.name
                     detail: `${watchRow.modelData.schedule_text}` +
                             (watchRow.modelData.next_run ? ` · next ${root.when(watchRow.modelData.next_run)}` : "")
+                }
+                IconButton {
+                    size: 28
+                    iconName: "play_arrow"
+                    tip: "Run now"
+                    onClicked: Gecko.call("watchers", { run: watchRow.modelData.id })
                 }
                 IconButton {
                     size: 28
