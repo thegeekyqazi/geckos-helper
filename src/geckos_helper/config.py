@@ -70,6 +70,7 @@ CAPABILITIES: dict[str, str] = {
     "watchers": "Create and manage background watchers",
     "goals": "Track goals and plans in your Obsidian vault",
     "recipes": "Create, enable and run recipes; read the inbox",
+    "notes": "Read and write your desktop sticky notes",
 }
 DEFAULT_OFF = {"clipboard_read"}
 

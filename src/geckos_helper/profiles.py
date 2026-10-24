@@ -18,7 +18,7 @@ READ_ONLY_GECKO_TOOLS = [
     "mcp__gecko__calendar_events", "mcp__gecko__calendar_list", "mcp__gecko__system_status",
     "mcp__gecko__todo_list", "mcp__gecko__obsidian_search", "mcp__gecko__obsidian_read",
     "mcp__gecko__obsidian_open_tasks", "mcp__gecko__media_now_playing", "mcp__gecko__chat_search",
-    "mcp__gecko__weather", "mcp__gecko__goal_list", "mcp__gecko__watch_list",
+    "mcp__gecko__weather", "mcp__gecko__goal_list", "mcp__gecko__watch_list", "mcp__gecko__notes_list",
 ]
 
 

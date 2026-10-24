@@ -16,7 +16,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import activity, handoff_export, paths, recipes, watchers
 from .config import load_state
-from .desktop import calendar, goals, obsidian, system, todo, untrusted
+from .desktop import calendar, goals, notes, obsidian, system, todo, untrusted
 from .desktop import weather as weather_mod
 from .handoff import open_claude_code
 
@@ -250,6 +250,36 @@ def obsidian_write_note(path: str, content: str, overwrite: bool = False) -> str
 def obsidian_append(path: str, content: str) -> str:
     """Append text to the end of a note, creating it if needed."""
     return obsidian.append(path, content)
+
+
+# --- desktop notes ------------------------------------------------------------
+
+@server.tool()
+@gated("notes")
+def notes_list() -> list[dict]:
+    """The user's desktop sticky notes (the Notes widget on the desktop)."""
+    return notes.list_notes()
+
+
+@server.tool()
+@gated("notes", writes=True)
+def notes_add(content: str) -> dict:
+    """Pin a short note to the desktop Notes widget ("jot this on my desktop")."""
+    return notes.add(content)
+
+
+@server.tool()
+@gated("notes", writes=True)
+def notes_update(note_id: str, content: str) -> dict:
+    """Replace a desktop note's text (id from notes_list)."""
+    return notes.update(note_id, content)
+
+
+@server.tool()
+@gated("notes", writes=True)
+def notes_delete(note_id: str) -> str:
+    """Remove a desktop note (id from notes_list)."""
+    return notes.delete(note_id)
 
 
 # --- goals ------------------------------------------------------------------
