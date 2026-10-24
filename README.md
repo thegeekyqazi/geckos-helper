@@ -32,6 +32,7 @@ to show your events.
   chat, and / commands work there too.
 - Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
+- **Projects** page: your vault's projects and goals with progress and next task, plus your ideas list
 - **Inbox** for recipe reports (the daily briefing arrives at 8:00), with an unread badge
 - **Activity** page: everything Gecko did, who approved it, watchers and goal progress
 - **Memory** page: what Gecko remembers (Claude Code's own memory), plus search across all chats
@@ -172,15 +173,13 @@ there, Gecko gives you the details to add in Outlook.
 - [x] Activity page: audit trail of everything Gecko did and what's scheduled
 - [x] Memory: Claude Code's own memory, viewable/editable in the panel, plus search across past chats
 - [x] Watchers: read-only background checks that notify you ("tell me if it'll rain before class")
-- [x] Goals: turn a goal into a tracked plan in Obsidian with progress and next steps
 - [x] Desktop mascot showing idle / working / needs-approval
 - [x] Calendar layer (ICS + Google read/write), clash check, calendar page in the panel
 - [ ] DavMail / CalDAV provider for Outlook writes, only if Laurier ICT approves
 - [x] Safety: injection guard with chat tainting, read-only profile for unattended runs
 - [x] Recipes (TOML) on schedules and event triggers, inbox, usage budget, daily briefing; see [docs/RECIPES.md](docs/RECIPES.md)
-- [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
+- [x] Obsidian projects, goals and ideas in your note style, hub table, project check-ins, one-click suggested to-dos; see [docs/PROJECTS.md](docs/PROJECTS.md)
 - [x] Attachments (screenshot, window, clipboard, selection, file), / commands, quick ask on Super+Space
-- [ ] Codex and OpenCode backends (ACP)
 
 ## Future ideas
 
@@ -196,6 +195,7 @@ Newelle, Raycast). Not scheduled yet.
 - **Study mode**: quizzes and flashcards generated from Obsidian course notes before a test
 - **D2L / Brightspace sync**: assignments and deadlines from the D2L scraper into the calendar and to-dos
 - **Projects**: chats grouped per course or project, each with its own instructions and files
+- **Codex and OpenCode** as agents, through ACP (`opencode acp`, codex-acp); the daemon's events already use ACP names
 - **Focus mode**: during class (from the calendar), hold non-urgent notifications and summarize them afterwards
 
 ## License
