@@ -71,7 +71,10 @@ Singleton {
         if (msg.reply !== undefined && msg.reply !== null) {
             const cb = root.callbacks[msg.reply];
             delete root.callbacks[msg.reply];
-            if (!msg.ok) root.addError(msg.error);
+            if (!msg.ok) {
+                root.exporting = false;
+                root.addError(msg.error);
+            }
             else if (cb) cb(msg);
             return;
         }
@@ -315,6 +318,23 @@ Singleton {
 
     function setCapability(name, on) {
         root.call("capability", { name: name, on: on });
+    }
+
+    // Copy this chat to the clipboard to continue elsewhere. mode: transcript | brief
+    property bool exporting: false
+    function exportChat(mode, cb) {
+        if (!root.chatId) return;
+        root.exporting = true;
+        root.call("export", { chat: root.chatId, mode: mode }, r => {
+            root.exporting = false;
+            Quickshell.execDetached(["notify-send", "-a", "Gecko's Helper", "Copied to clipboard",
+                mode === "brief" ? "Hand-off brief ready to paste into Claude.ai" : "Chat transcript copied"]);
+            if (cb) cb(r);
+        });
+    }
+
+    function cycleTheme(step) {
+        root.call("theme", { step: step ?? 1 });
     }
 
     function regenerateContext(cb) {
