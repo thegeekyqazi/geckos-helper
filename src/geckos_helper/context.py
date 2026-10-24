@@ -13,7 +13,7 @@ import time
 import tomllib
 from datetime import datetime
 
-from . import paths
+from . import paths, profiles
 from .config import expand, load_config, load_state
 
 SNAPSHOT = paths.DATA_DIR / "context.json"
@@ -133,6 +133,7 @@ def write_agent_files() -> None:
     paths.ensure_dirs()
     mcp = {"mcpServers": {"gecko": {"command": sys.executable, "args": ["-m", "geckos_helper", "mcp"]}}}
     paths.MCP_CONFIG_FILE.write_text(json.dumps(mcp, indent=2))
+    profiles.write_readonly_mcp_config(sys.executable)
     if not paths.CLAUDE_SETTINGS.exists():
         paths.CLAUDE_SETTINGS.write_text((paths.PROFILE_DIR / "claude-settings.json").read_text())
     if not paths.SYSTEM_PROMPT_FILE.exists():
