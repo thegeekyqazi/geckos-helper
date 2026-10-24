@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Any
 
-from . import activity, config, context, guard, handoff_export, memory, paths, rules, theme, watchers
+from . import activity, budget, config, context, guard, handoff_export, memory, paths, rules, theme, watchers
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, goals
 from .store import Store
@@ -73,6 +73,7 @@ class Daemon:
         self.taint: dict[str, dict] = load_taint()
         self.usage: dict[str, Any] = {}
         self.watcher_lock = asyncio.Lock()
+        self.budget_logged = 0.0
 
     # --- events ----------------------------------------------------------
 
@@ -256,6 +257,7 @@ class Daemon:
         state = config.load_state()
         return {"killed": state["killed"], "capabilities": state["capabilities"],
                 "capability_descriptions": config.CAPABILITIES, "default_model": config.default_model(),
+                "budget": budget.status(self.usage),
                 "running": list(self.backends), "usage": self.usage, "pid": os.getpid()}
 
     async def op_kill(self, req: dict) -> dict:
@@ -385,12 +387,20 @@ class Daemon:
                 await self.broadcast({"event": "watcher_running", "on": False})
         await self.broadcast({"event": "activity", **entry, "kind": "watcher"})
 
+    def budget_ok(self) -> bool:
+        """Unattended runs respect the usage budget; log a pause at most once an hour."""
+        ok, reason = budget.check(self.usage)
+        if not ok and time.time() - self.budget_logged > 3600:
+            self.budget_logged = time.time()
+            activity.log("budget", reason=reason)
+        return ok
+
     async def schedule_watchers(self) -> None:
-        """Run due watchers; skip while the 5-hour usage window is nearly used up."""
+        """Run due watchers within the usage budget."""
         while True:
             await asyncio.sleep(30)
             try:
-                if (self.usage.get("five_hour") or 0) > 0.9:
+                if not self.budget_ok():
                     continue
                 for w in watchers.due():
                     watchers.update(w["id"], last_run=time.time())  # don't re-queue while running
