@@ -21,6 +21,24 @@ from .store import Store
 log = logging.getLogger("gecko")
 
 
+DENIED = ("The user denied this action. Do not retry it or work around it; "
+          "say what you were trying to do and ask how they want to proceed.")
+
+
+def call_key(tool: str, inp: dict) -> str:
+    return f"{tool}:{json.dumps(inp, sort_keys=True)}"
+
+
+def rule_key(tool: str, inp: dict) -> str:
+    """What "allow for this chat" remembers: the tool, and for Bash the exact command.
+
+    Allowing a whole program (e.g. every `rm`) would be too broad for a one-click approval.
+    """
+    if tool == "Bash":
+        return f"Bash:{inp.get('command', '')}"
+    return tool
+
+
 class Daemon:
     def __init__(self) -> None:
         self.store = Store()
@@ -28,6 +46,11 @@ class Daemon:
         self.backends: dict[str, ClaudeBackend] = {}
         self.last_active: dict[str, float] = {}
         self.pending: dict[str, str] = {}  # permission request_id -> chat id
+        # "Allow for this chat" approvals: chat id -> rule keys (see rule_key)
+        self.chat_allows: dict[str, set[str]] = {}
+        # Calls the user denied this turn: an identical retry is denied without asking again
+        self.turn_denials: dict[str, set[str]] = {}
+        self.request_keys: dict[str, str] = {}  # request_id -> exact call key
         self.usage: dict[str, Any] = {}
 
     # --- events ----------------------------------------------------------
@@ -46,7 +69,18 @@ class Daemon:
             if kind == "session_ready":
                 self.store.update(chat_id, session_id=data["session_id"])
             elif kind == "permission_request":
+                exact = call_key(data["tool"], data["input"])
+                if exact in self.turn_denials.get(chat_id, ()):
+                    await self.backends[chat_id].respond_permission(
+                        data["request_id"], False, DENIED + " You already asked for this exact action.")
+                    return
+                if rule_key(data["tool"], data["input"]) in self.chat_allows.get(chat_id, ()):
+                    await self.backends[chat_id].respond_permission(data["request_id"], True)
+                    return
                 self.pending[data["request_id"]] = chat_id
+                self.request_keys[data["request_id"]] = exact
+            elif kind == "user_message":
+                self.turn_denials.pop(chat_id, None)
             elif kind == "usage":
                 self.usage = data
             elif kind == "closed":
@@ -64,9 +98,10 @@ class Daemon:
             cfg = config.load_config()
             if chat["agent"] != "claude":
                 raise ValueError(f"Agent '{chat['agent']}' is not supported yet")
+            agent_cfg = {**cfg["agents"]["claude"], "model": chat.get("model") or config.default_model()}
             extra = [chat["cwd"]] if chat.get("cwd") else []
             self.backends[chat["id"]] = ClaudeBackend(
-                self.emitter(chat["id"]), cfg["agents"]["claude"], chat.get("session_id"), extra)
+                self.emitter(chat["id"]), agent_cfg, chat.get("session_id"), extra)
         return self.backends[chat["id"]]
 
     async def op_send(self, req: dict) -> dict:
@@ -75,8 +110,10 @@ class Daemon:
         chat = self.store.get(req["chat"]) if req.get("chat") else None
         if not chat:
             title = req["text"].strip().splitlines()[0][:60] or "New chat"
-            chat = self.store.create(req.get("agent", "claude"), title, req.get("cwd"))
-            await self.broadcast({"event": "chat_created", "chat": chat["id"], **chat})
+            agent = req.get("agent", "claude")
+            chat = self.store.create(agent, req.get("model") or config.default_model(agent), title, req.get("cwd"))
+            # nonce lets the client that sent this adopt the new chat id
+            await self.broadcast({"event": "chat_created", **chat, "chat": chat["id"], "nonce": req.get("nonce")})
         backend = self.backend_for(chat)
         await self.emitter(chat["id"])("user_message", {"text": req["text"]})
         await backend.prompt(req["text"])
@@ -84,9 +121,16 @@ class Daemon:
         return {"chat": chat["id"]}
 
     async def op_permission(self, req: dict) -> dict:
+        """allow: bool; scope: "once" (default) or "chat" to stop asking for this kind of call."""
         chat_id = self.pending.pop(req["request_id"])
         backend = self.backends[chat_id]
-        await backend.respond_permission(req["request_id"], bool(req["allow"]), req.get("message", ""))
+        exact = self.request_keys.pop(req["request_id"], None)
+        if not req["allow"] and exact:
+            self.turn_denials.setdefault(chat_id, set()).add(exact)
+        if req["allow"] and req.get("scope") == "chat" and "tool" in req:
+            self.chat_allows.setdefault(chat_id, set()).add(rule_key(req["tool"], req.get("input", {})))
+        message = DENIED + (f" They said: {req['message']}" if req.get("message") else "")
+        await backend.respond_permission(req["request_id"], bool(req["allow"]), message)
         await self.broadcast({"event": "permission_resolved", "chat": chat_id,
                               "request_id": req["request_id"], "allow": bool(req["allow"])})
         return {}
@@ -100,10 +144,34 @@ class Daemon:
         chats = self.store.list(req.get("limit", 50))
         for c in chats:
             c["running"] = c["id"] in self.backends
+            c["busy"] = c["running"] and self.backends[c["id"]].busy
         return {"chats": chats}
 
+    async def op_models(self, req: dict) -> dict:
+        agent = req.get("agent", "claude")
+        return {"models": config.load_config()["agents"][agent]["models"],
+                "default": config.default_model(agent)}
+
+    async def op_set_model(self, req: dict) -> dict:
+        """Switch a chat's model; the agent restarts with --resume on the next message."""
+        self.store.update(req["chat"], model=req["model"])
+        if (b := self.backends.get(req["chat"])) and not b.busy:
+            await b.close()
+            self.backends.pop(req["chat"], None)
+        await self.broadcast({"event": "chat_updated", "chat": req["chat"], "model": req["model"]})
+        return {}
+
+    async def op_set_default_model(self, req: dict) -> dict:
+        config.set_default_model(req["model"], req.get("agent", "claude"))
+        await self.broadcast({"event": "default_model", "model": req["model"]})
+        return {}
+
     async def op_history(self, req: dict) -> dict:
-        return {"chat": self.store.get(req["chat"]), "entries": self.store.transcript(req["chat"])}
+        chat = self.store.get(req["chat"])
+        b = self.backends.get(req["chat"])
+        pending = [rid for rid, c in self.pending.items() if c == req["chat"]]
+        return {"chat": chat, "entries": self.store.transcript(req["chat"]),
+                "busy": bool(b and b.busy), "pending_permissions": pending}
 
     async def op_delete(self, req: dict) -> dict:
         if b := self.backends.pop(req["chat"], None):
@@ -114,6 +182,7 @@ class Daemon:
     async def op_status(self, req: dict) -> dict:
         state = config.load_state()
         return {"killed": state["killed"], "capabilities": state["capabilities"],
+                "capability_descriptions": config.CAPABILITIES, "default_model": config.default_model(),
                 "running": list(self.backends), "usage": self.usage, "pid": os.getpid()}
 
     async def op_kill(self, req: dict) -> dict:

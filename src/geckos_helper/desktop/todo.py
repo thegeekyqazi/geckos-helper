@@ -1,7 +1,6 @@
 """end-4 to-do list (~/.local/state/quickshell/user/todo.json: [{content, done}])."""
 
 import json
-import subprocess
 
 from .. import paths
 
@@ -17,11 +16,7 @@ def _save(items: list[dict]) -> None:
     paths.END4_TODO.parent.mkdir(parents=True, exist_ok=True)
     tmp = paths.END4_TODO.with_suffix(".tmp")
     tmp.write_text(json.dumps(items))
-    tmp.replace(paths.END4_TODO)
-    # end-4's Todo service only reads the file at startup; the Gecko overlay
-    # registers this IPC target so the widget reloads. Harmless if absent.
-    subprocess.run(["qs", "-c", "ii", "ipc", "call", "geckoTodo", "refresh"],
-                   capture_output=True, timeout=5, stdin=subprocess.DEVNULL)
+    tmp.replace(paths.END4_TODO)  # end-4's widget reloads it via the end4.py patch
 
 
 def list_items(include_done: bool = False) -> list[dict]:

@@ -15,7 +15,7 @@ from . import paths
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS chats (
     id TEXT PRIMARY KEY, title TEXT, agent TEXT, session_id TEXT,
-    cwd TEXT, created REAL, updated REAL
+    cwd TEXT, created REAL, updated REAL, model TEXT
 );
 CREATE TABLE IF NOT EXISTS entries (
     chat_id TEXT, ts REAL, kind TEXT, data TEXT
@@ -24,7 +24,8 @@ CREATE INDEX IF NOT EXISTS entries_chat ON entries(chat_id, ts);
 """
 
 # Events worth keeping in the transcript (streaming chunks are not).
-TRANSCRIPT_KINDS = {"user_message", "agent_message", "tool_call", "tool_call_update", "turn_end", "error"}
+TRANSCRIPT_KINDS = {"user_message", "agent_message", "tool_call", "tool_call_update", "permission_request",
+                    "turn_end", "error"}
 
 
 class Store:
@@ -33,12 +34,16 @@ class Store:
         self.db = sqlite3.connect(paths.CHATS_DB)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        cols = {r["name"] for r in self.db.execute("PRAGMA table_info(chats)")}
+        if "model" not in cols:  # added after 0.1
+            self.db.execute("ALTER TABLE chats ADD COLUMN model TEXT")
 
-    def create(self, agent: str, title: str = "New chat", cwd: str | None = None) -> dict:
+    def create(self, agent: str, model: str, title: str = "New chat", cwd: str | None = None) -> dict:
         now = time.time()
-        chat = {"id": uuid.uuid4().hex[:12], "title": title, "agent": agent,
-                "session_id": None, "cwd": cwd, "created": now, "updated": now}
-        self.db.execute("INSERT INTO chats VALUES (:id,:title,:agent,:session_id,:cwd,:created,:updated)", chat)
+        chat = {"id": uuid.uuid4().hex[:12], "title": title, "agent": agent, "session_id": None,
+                "cwd": cwd, "created": now, "updated": now, "model": model}
+        self.db.execute("INSERT INTO chats (id, title, agent, session_id, cwd, created, updated, model) "
+                        "VALUES (:id,:title,:agent,:session_id,:cwd,:created,:updated,:model)", chat)
         self.db.commit()
         return chat
 

@@ -6,8 +6,22 @@ first; Codex and OpenCode planned) instead of API keys. It gives them safe,
 toggleable access to your desktop: to-dos, notifications, calendar, Obsidian
 vault, media and system info.
 
-> Status: **early**. The daemon, the desktop MCP server, the context generator and a
-> terminal client work. The Quickshell sidebar UI is next (see the roadmap).
+> Status: **early but usable**. The panel (Super+A), the daemon, the desktop MCP server,
+> the context generator and a terminal client work. See the roadmap.
+
+## The panel
+
+`qs -c gecko`, a separate Quickshell config that reuses end-4's own widgets and
+wallpaper colors through symlinks, so it looks native but end-4 updates never
+overwrite it. It replaces end-4's left sidebar on **Super+A** (Super+B / Super+O
+still open end-4's).
+
+- Streaming replies with markdown, collapsible tool cards, "thinking" blocks
+- Permission cards: **Allow**, **Allow for this chat**, **Deny**
+- Model picker per chat; the star sets the default for new chats (Sonnet out of the box)
+- Chat history, capability switches, kill switch, 5-hour / 7-day usage bars
+- Ctrl+N new chat, Ctrl+H history, Ctrl+O wider panel, Esc closes
+- `qs -c gecko ipc call gecko ask "..."` sends a prompt from a script or keybind
 
 ## How it fits together
 
@@ -60,18 +74,24 @@ vault, media and system info.
   `hl.bind("SUPER+ALT+K", hl.dsp.exec_cmd("~/.local/bin/gecko kill toggle"), {description = "Gecko kill switch"})`
 - **Action log:** every write a tool makes is appended to
   `~/.local/state/geckos-helper/actions.jsonl`.
+- **No retry loops:** after you deny an action, an identical request in the same
+  turn is denied automatically and the agent is told not to work around it.
+- **"Allow for this chat"** remembers the tool for that chat only; for shell
+  commands it remembers the exact command, never a whole program.
 
 ## Install
 
 Requires [uv](https://docs.astral.sh/uv/), Python 3.14 and Claude Code logged in.
 
 ```sh
-./install.sh          # installs `gecko`, the systemd user units, and starts the daemon
+./install.sh          # installs `gecko`, the panel, keybinds, end-4 add-ons and systemd units
 gecko chat            # talk to it in the terminal
 gecko ask "what's due this week in my vault?"
 gecko caps            # list capability toggles
+gecko model opus --default   # or pick it in the panel
 gecko kill toggle
-./uninstall.sh        # removes command and units, keeps your data
+gecko end4-patch      # re-apply the end-4 add-ons after an end-4 update
+./uninstall.sh        # removes everything it added, keeps your data
 ```
 
 Config lives in `~/.config/geckos-helper/config.toml` (agent path, model,
@@ -94,10 +114,11 @@ url = "https://outlook.office365.com/owa/calendar/.../calendar.ics"
 - [x] Daemon, Claude Code backend, permission round-trip, chat resume
 - [x] Desktop MCP server, capability toggles, kill switch, action log
 - [x] Context file generator + daily timer
-- [ ] Quickshell sidebar UI (overlay on end-4, survives updates) with tool cards, approve/deny, history, agent/model picker, usage meter
+- [x] Quickshell panel on Super+A with tool cards, approve/deny, history, model picker, usage meter
+- [x] end-4 to-do widget picks up agent edits (small re-appliable patch)
 - [ ] Scheduler: cron-style and event-triggered background tasks, activity inbox, usage budget
 - [ ] Injection classifier for untrusted content
-- [ ] Google Calendar (read/write) + a richer calendar widget
+- [ ] Writable calendar: local store synced both ways (vdirsyncer) with Google + Outlook (DavMail) + a richer calendar widget
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
 - [ ] Desktop context buttons (clipboard, focused window, screenshot region), quick-ask keybind
 - [ ] Codex and OpenCode backends (ACP)

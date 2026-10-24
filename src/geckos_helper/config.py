@@ -13,7 +13,8 @@ DEFAULT_CONFIG = """\
 
 [agents.claude]
 path = "~/.local/bin/claude"
-model = ""                 # empty = your Claude Code default
+model = "sonnet"           # default for new chats; `gecko model <name> --default` changes it
+models = ["sonnet", "opus", "haiku"]  # shown in the model picker
 # true: also load your normal ~/.claude settings, hooks and CLAUDE.md.
 # false: only the sidebar profile's own settings.
 inherit_settings = true
@@ -91,6 +92,17 @@ def save_state(state: dict[str, Any]) -> None:
 def set_killed(on: bool) -> None:
     state = load_state()
     state["killed"] = on
+    save_state(state)
+
+
+def default_model(agent: str = "claude") -> str:
+    """The UI-chosen default (state.json) wins over config.toml."""
+    return load_state().get("default_models", {}).get(agent) or load_config()["agents"][agent]["model"]
+
+
+def set_default_model(model: str, agent: str = "claude") -> None:
+    state = load_state()
+    state.setdefault("default_models", {})[agent] = model
     save_state(state)
 
 

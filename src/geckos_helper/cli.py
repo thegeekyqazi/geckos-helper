@@ -123,6 +123,12 @@ def main() -> None:
     sub.add_parser("status", help="daemon status")
     k = sub.add_parser("kill", help="kill switch: stop agents and block desktop access")
     k.add_argument("state", choices=["on", "off", "toggle"])
+    m = sub.add_parser("model", help="show models, or switch a chat's model / the default")
+    m.add_argument("name", nargs="?")
+    m.add_argument("--default", action="store_true", help="make it the default for new chats")
+    m.add_argument("--chat", help="switch this chat to the model")
+    ep = sub.add_parser("end4-patch", help="(re)apply the end-4 add-ons and keybinds after an end-4 update")
+    ep.add_argument("--revert", action="store_true", help="remove them")
     cp = sub.add_parser("caps", help="list or toggle capabilities")
     cp.add_argument("name", nargs="?")
     cp.add_argument("state", nargs="?", choices=["on", "off"])
@@ -153,6 +159,23 @@ def main() -> None:
                 except (FileNotFoundError, ConnectionRefusedError):
                     config.set_killed(on)  # works even when the daemon is down
                 print(f"kill switch {'ON: agents stopped, desktop access blocked' if on else 'off'}")
+            case "model":
+                if args.name and args.chat:
+                    asyncio.run(cmd_simple("set_model", chat=args.chat, model=args.name))
+                if args.name and (args.default or not args.chat):
+                    config.set_default_model(args.name)
+                print(f"default: {config.default_model()}  available: "
+                      + ", ".join(config.load_config()["agents"]["claude"]["models"]))
+            case "end4-patch":
+                from . import end4
+                if args.revert:
+                    end4.revert()
+                    end4.remove_keybinds()
+                    print("removed the end-4 add-ons and keybinds")
+                else:
+                    applied = end4.apply()
+                    end4.install_keybinds()
+                    print("applied: " + ", ".join(applied + ["keybinds"]))
             case "caps":
                 if args.name and args.state:
                     try:
