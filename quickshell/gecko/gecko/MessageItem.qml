@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -22,16 +23,48 @@ Item {
     required property string tool
     required property string inputJson
 
-    implicitHeight: loader.implicitHeight
+    // Assistant-side entries (text, tools, thoughts) sit indented under the avatar
+    readonly property real indent: 34
+    // The avatar only shows on the first assistant entry after a user message
+    readonly property bool firstOfReply: {
+        if (root.kind === "user" || root.index === 0) return false;
+        return Gecko.messages.get(root.index - 1)?.kind === "user";
+    }
+
+    implicitHeight: loader.implicitHeight + (firstOfReply ? 26 : 0)
+
+    Row { // Avatar + name
+        visible: root.firstOfReply
+        spacing: 8
+        Rectangle {
+            width: 26
+            height: 26
+            radius: 13
+            color: Theme.surfaceHigh
+            GText {
+                anchors.centerIn: parent
+                text: Theme.avatar
+                rel: 0.85
+            }
+        }
+        GText {
+            anchors.verticalCenter: parent.verticalCenter
+            text: Theme.assistantName
+            font.weight: Font.DemiBold
+            rel: 0.87
+        }
+    }
 
     Loader {
         id: loader
-        width: root.width
+        y: root.firstOfReply ? 26 : 0
+        x: root.kind === "user" ? 0 : root.indent
+        width: root.width - x
         sourceComponent: ({
             user: userBubble,
             agent: agentText,
             thought: thoughtBlock,
-            tool: toolCard,
+            tool: toolRow,
             permission: permissionCard,
             error: errorBox,
         })[root.kind] ?? null
@@ -40,23 +73,24 @@ Item {
     Component {
         id: userBubble
         Item {
-            implicitHeight: bubble.implicitHeight
+            implicitHeight: bubble.implicitHeight + 6
             Rectangle {
                 id: bubble
                 anchors.right: parent.right
-                width: Math.min(parent.width * 0.85, userText.implicitWidth + 24)
-                implicitHeight: userText.implicitHeight + 16
-                radius: Appearance.rounding.normal
-                color: Appearance.colors.colPrimaryContainer
-                StyledText {
+                anchors.top: parent.top
+                anchors.topMargin: 6
+                width: Math.min(parent.width * 0.85, userText.implicitWidth + 28)
+                implicitHeight: userText.implicitHeight + 20
+                radius: Theme.bubbleRadius
+                color: Theme.userBubble
+                GText {
                     id: userText
                     anchors.fill: parent
-                    anchors.margins: 8
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                    anchors.margins: 10
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
                     text: root.text
-                    wrapMode: Text.Wrap
-                    color: Appearance.colors.colOnPrimaryContainer
+                    color: Theme.userBubbleText
                     textFormat: Text.PlainText
                 }
             }
@@ -65,14 +99,38 @@ Item {
 
     Component {
         id: agentText
-        StyledText {
-            text: root.text + (root.streaming ? " ▍" : "")
-            wrapMode: Text.Wrap
-            textFormat: Text.MarkdownText
-            color: Appearance.colors.colOnLayer0
-            leftPadding: 4
-            rightPadding: 4
-            onLinkActivated: link => Qt.openUrlExternally(link)
+        ColumnLayout {
+            spacing: 2
+            GText {
+                id: body
+                Layout.fillWidth: true
+                text: root.text + (root.streaming ? " ●" : "")
+                textFormat: Text.MarkdownText
+                lineHeight: 1.25
+                onLinkActivated: link => Qt.openUrlExternally(link)
+            }
+            Row { // Actions under a finished reply
+                visible: !root.streaming
+                spacing: 0
+                opacity: hover.hovered ? 1 : 0.55
+                IconButton {
+                    id: copyButton
+                    size: 28
+                    iconName: "content_copy"
+                    tip: "Copy"
+                    onClicked: {
+                        Quickshell.execDetached(["wl-copy", root.text]);
+                        iconName = "check";
+                        resetIcon.restart();
+                    }
+                    Timer {
+                        id: resetIcon
+                        interval: 1500
+                        onTriggered: copyButton.iconName = "content_copy"
+                    }
+                }
+            }
+            HoverHandler { id: hover }
         }
     }
 
@@ -81,90 +139,118 @@ Item {
         ColumnLayout {
             id: tb
             property bool expanded: false
-            spacing: 2
-            RippleButton {
-                implicitHeight: 26
-                implicitWidth: thoughtLabel.implicitWidth + 20
-                buttonRadius: Appearance.rounding.full
-                onClicked: tb.expanded = !tb.expanded
-                contentItem: RowLayout {
-                    id: thoughtLabel
-                    anchors.centerIn: parent
-                    MaterialSymbol { text: "psychology"; color: Appearance.colors.colSubtext }
-                    StyledText {
-                        text: root.streaming ? "Thinking…" : "Thought"
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Appearance.colors.colSubtext
+            spacing: 4
+            RowLayout {
+                spacing: 6
+                MaterialSymbol {
+                    text: "psychology"
+                    color: Theme.textMuted
+                    iconSize: 16
+                }
+                GText {
+                    text: root.streaming ? "Thinking…" : "Thought for a moment"
+                    muted: true
+                    rel: 0.85
+                    SequentialAnimation on opacity {
+                        running: root.streaming
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1; to: 0.4; duration: 700 }
+                        NumberAnimation { from: 0.4; to: 1; duration: 700 }
                     }
                 }
+                MaterialSymbol {
+                    text: tb.expanded ? "expand_less" : "expand_more"
+                    color: Theme.textMuted
+                    iconSize: 16
+                }
+                TapHandler { onTapped: tb.expanded = !tb.expanded }
             }
-            StyledText {
+            Rectangle {
                 Layout.fillWidth: true
                 visible: tb.expanded
-                text: root.text
-                wrapMode: Text.Wrap
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colSubtext
-                leftPadding: 10
+                implicitHeight: thoughtText.implicitHeight + 8
+                color: "transparent"
+                Rectangle { width: 2; height: parent.height; color: Theme.border }
+                GText {
+                    id: thoughtText
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 12
+                    text: root.text
+                    muted: true
+                    rel: 0.85
+                }
             }
         }
     }
 
     Component {
-        id: toolCard
+        id: toolRow
         Rectangle {
             id: tc
             property bool expanded: false
-            implicitHeight: tcCol.implicitHeight + 12
-            radius: Appearance.rounding.small
-            color: Appearance.colors.colLayer1
+            implicitHeight: tcCol.implicitHeight + 10
+            radius: Theme.cardRadius - 4
+            color: tc.expanded ? Theme.toolBg : "transparent"
+            border.width: 1
+            border.color: Theme.border
             ColumnLayout {
                 id: tcCol
                 anchors.fill: parent
-                anchors.margins: 6
+                anchors.margins: 5
+                anchors.leftMargin: 10
+                anchors.rightMargin: 8
                 spacing: 4
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 8
                     MaterialSymbol {
                         text: root.status === "running" ? "progress_activity"
-                            : root.status === "failed" ? "error" : "check_circle"
-                        color: root.status === "failed" ? Appearance.colors.colError : Appearance.colors.colSubtext
+                            : root.status === "failed" ? "error" : "check"
+                        color: root.status === "failed" ? Theme.errorText : Theme.textMuted
+                        iconSize: 16
                         RotationAnimation on rotation {
                             running: root.status === "running"
                             from: 0; to: 360; duration: 1000; loops: Animation.Infinite
                         }
                     }
-                    StyledText {
+                    GText {
                         Layout.fillWidth: true
                         text: root.title
+                        muted: true
+                        rel: 0.82
                         elide: Text.ElideRight
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: Appearance.colors.colOnLayer1
+                        wrapMode: Text.NoWrap
                     }
                     MaterialSymbol {
                         visible: root.output.length > 0
                         text: tc.expanded ? "expand_less" : "expand_more"
-                        color: Appearance.colors.colSubtext
+                        color: Theme.textMuted
+                        iconSize: 16
                     }
                 }
-                StyledText {
+                Rectangle {
                     Layout.fillWidth: true
                     visible: tc.expanded
-                    text: root.output
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 30
-                    elide: Text.ElideRight
-                    font.family: Appearance.font.family.monospace
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colSubtext
+                    implicitHeight: outText.implicitHeight + 12
+                    radius: 8
+                    color: Theme.codeBg
+                    GText {
+                        id: outText
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        text: root.output
+                        maximumLineCount: 30
+                        elide: Text.ElideRight
+                        font.family: Theme.monoFont
+                        rel: 0.75
+                        muted: true
+                    }
                 }
             }
-            MouseArea {
-                anchors.fill: parent
+            TapHandler {
                 enabled: root.output.length > 0
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: tc.expanded = !tc.expanded
+                onTapped: tc.expanded = !tc.expanded
             }
         }
     }
@@ -172,55 +258,69 @@ Item {
     Component {
         id: permissionCard
         Rectangle {
-            implicitHeight: pcCol.implicitHeight + 20
-            radius: Appearance.rounding.normal
-            color: root.permState === "pending" ? Appearance.colors.colTertiaryContainer : Appearance.colors.colLayer1
+            id: pcard
+            readonly property bool pending: root.permState === "pending"
+            implicitHeight: pcCol.implicitHeight + 24
+            radius: Theme.cardRadius
+            color: pending ? Theme.permissionBg : "transparent"
+            border.width: pending ? 0 : 1
+            border.color: Theme.border
             ColumnLayout {
                 id: pcCol
                 anchors.fill: parent
-                anchors.margins: 10
-                spacing: 6
+                anchors.margins: 12
+                spacing: 8
                 RowLayout {
-                    spacing: 6
+                    spacing: 8
                     MaterialSymbol {
-                        text: root.permState === "allowed" ? "check" : root.permState === "denied" ? "block" : "shield_question"
-                        color: Appearance.colors.colOnTertiaryContainer
-                        iconSize: Appearance.font.pixelSize.larger
+                        text: root.permState === "allowed" ? "check_circle"
+                            : root.permState === "denied" ? "block" : "shield_question"
+                        color: pcard.pending ? Theme.permissionText : Theme.textMuted
+                        iconSize: 20
                     }
-                    StyledText {
+                    GText {
                         Layout.fillWidth: true
-                        text: root.permState === "pending" ? `Allow: ${root.title}?`
+                        text: root.permState === "pending" ? `Allow ${root.title}?`
                             : root.permState === "allowed" ? `Allowed: ${root.title}`
                             : root.permState === "denied" ? `Denied: ${root.title}` : root.title
-                        wrapMode: Text.Wrap
-                        color: root.permState === "pending" ? Appearance.colors.colOnTertiaryContainer : Appearance.colors.colSubtext
+                        color: pcard.pending ? Theme.permissionText : Theme.textMuted
+                        font.weight: pcard.pending ? Font.DemiBold : Font.Normal
+                        rel: 0.9
                     }
                 }
-                StyledText {
+                Rectangle {
                     Layout.fillWidth: true
-                    visible: root.permState === "pending" && root.inputJson !== "{}"
-                    text: root.inputJson
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 12
-                    elide: Text.ElideRight
-                    font.family: Appearance.font.family.monospace
-                    font.pixelSize: Appearance.font.pixelSize.smallest
-                    color: Appearance.colors.colOnTertiaryContainer
+                    visible: pcard.pending && root.inputJson !== "{}"
+                    implicitHeight: inputText.implicitHeight + 14
+                    radius: 8
+                    color: Qt.alpha(Theme.bg, 0.5)
+                    GText {
+                        id: inputText
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        text: root.inputJson
+                        maximumLineCount: 12
+                        elide: Text.ElideRight
+                        font.family: Theme.monoFont
+                        rel: 0.75
+                        color: Theme.permissionText
+                    }
                 }
                 RowLayout {
-                    visible: root.permState === "pending"
+                    visible: pcard.pending
                     spacing: 6
-                    DialogButton {
-                        buttonText: "Allow"
+                    PermissionButton {
+                        label: "Allow"
+                        primary: true
                         onClicked: Gecko.answerPermission(root.index, true, "once")
                     }
-                    DialogButton {
-                        buttonText: "Allow for this chat"
+                    PermissionButton {
+                        label: "Allow for chat"
                         onClicked: Gecko.answerPermission(root.index, true, "chat")
                     }
                     Item { Layout.fillWidth: true }
-                    DialogButton {
-                        buttonText: "Deny"
+                    PermissionButton {
+                        label: "Deny"
                         onClicked: Gecko.answerPermission(root.index, false)
                     }
                 }
@@ -228,20 +328,41 @@ Item {
         }
     }
 
+    component PermissionButton: RippleButton {
+        id: pb
+        property string label
+        property bool primary: false
+        implicitHeight: 32
+        implicitWidth: pbText.implicitWidth + 26
+        buttonRadius: Appearance.rounding.full
+        colBackground: primary ? Theme.permissionText : Qt.alpha(Theme.permissionText, 0.12)
+        colBackgroundHover: primary ? Qt.alpha(Theme.permissionText, 0.85) : Qt.alpha(Theme.permissionText, 0.2)
+        colRipple: Qt.alpha(Theme.permissionText, 0.3)
+        contentItem: GText {
+            id: pbText
+            anchors.centerIn: parent
+            horizontalAlignment: Text.AlignHCenter
+            text: pb.label
+            rel: 0.85
+            font.weight: Font.DemiBold
+            wrapMode: Text.NoWrap
+            color: pb.primary ? Theme.permissionBg : Theme.permissionText
+        }
+    }
+
     Component {
         id: errorBox
         Rectangle {
-            implicitHeight: errText.implicitHeight + 16
-            radius: Appearance.rounding.small
-            color: Appearance.colors.colErrorContainer
-            StyledText {
+            implicitHeight: errText.implicitHeight + 18
+            radius: Theme.cardRadius
+            color: Theme.errorBg
+            GText {
                 id: errText
                 anchors.fill: parent
-                anchors.margins: 8
+                anchors.margins: 9
                 text: root.text
-                wrapMode: Text.Wrap
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colOnErrorContainer
+                color: Theme.errorText
+                rel: 0.85
             }
         }
     }
