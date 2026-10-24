@@ -223,6 +223,7 @@ Singleton {
         }
         case "permission_request":
             messages.append(root.entry({ kind: "permission", requestId: e.request_id, title: e.title, tool: e.tool,
+                              output: e.warning ?? "",
                               inputJson: JSON.stringify(e.input ?? {}, null, 1),
                               permState: live ? "pending" : "expired", streaming: false }));
             break;
@@ -231,6 +232,10 @@ Singleton {
             if (i >= 0) messages.setProperty(i, "permState", e.allow ? "allowed" : "denied");
             break;
         }
+        case "guard_alert":
+            messages.append(root.entry({ kind: "guard", title: e.source, text: (e.reasons ?? []).join(", ") }));
+            root.tainted = true;
+            break;
         case "turn_end":
         case "closed":
             if (live) {
@@ -308,6 +313,7 @@ Singleton {
         root.chatTitle = "";
         root.chatModel = root.defaultModel;
         root.busy = false;
+        root.tainted = false;
         messages.clear();
         root.page = "chat";
     }
@@ -318,6 +324,7 @@ Singleton {
             root.chatTitle = r.chat.title;
             root.chatModel = r.chat.model || root.defaultModel;
             root.busy = r.busy;
+            root.tainted = !!r.taint;
             messages.clear();
             for (const e of r.entries) root.applyEntry(e.kind, e, false);
             // Requests still waiting for an answer stay actionable
@@ -329,6 +336,12 @@ Singleton {
             root.page = "chat";
             root.scrollToEnd();
         });
+    }
+
+    // This chat read content that looked like a prompt injection
+    property bool tainted: false
+    function clearTaint() {
+        root.call("untaint", { chat: root.chatId }, () => root.tainted = false);
     }
 
     function deleteChat(id) {
