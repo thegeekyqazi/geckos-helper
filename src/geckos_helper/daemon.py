@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from . import activity, config, context, handoff_export, memory, paths, rules, theme
+from . import activity, config, context, handoff_export, memory, paths, rules, theme, watchers
 from .backends.claude import ClaudeBackend
 from .store import Store
 
@@ -52,6 +52,7 @@ class Daemon:
         self.turn_denials: dict[str, set[str]] = {}
         self.request_info: dict[str, dict] = {}  # request_id -> the permission_request
         self.usage: dict[str, Any] = {}
+        self.watcher_lock = asyncio.Lock()
 
     # --- events ----------------------------------------------------------
 
@@ -243,6 +244,17 @@ class Daemon:
             memory.delete(req["remove"])
         return {"memories": memory.list_memories(), "dir": str(memory.memory_dir())}
 
+    async def op_watchers(self, req: dict) -> dict:
+        """No args: list. remove=<id>, pause=<id>/resume=<id>, run=<id> (run now)."""
+        if req.get("remove"):
+            watchers.remove(req["remove"])
+        elif req.get("pause") or req.get("resume"):
+            watchers.update(req.get("pause") or req["resume"], paused=bool(req.get("pause")))
+        elif req.get("run"):
+            w = next(w for w in watchers.load() if w["id"] == req["run"])
+            asyncio.create_task(self.run_watcher(w))
+        return {"watchers": [watchers.describe(w) for w in watchers.load()]}
+
     async def op_rules(self, req: dict) -> dict:
         """No args: list. match+action: add. remove=<index>: delete."""
         if "remove" in req:
@@ -295,6 +307,24 @@ class Daemon:
                 log.exception("theme watcher")
             await asyncio.sleep(1.5)
 
+    async def run_watcher(self, w: dict) -> None:
+        async with self.watcher_lock:  # one at a time, so they don't pile up on usage
+            entry = await watchers.run(w)
+        await self.broadcast({"event": "activity", **entry, "kind": "watcher"})
+
+    async def schedule_watchers(self) -> None:
+        """Run due watchers; skip while the 5-hour usage window is nearly used up."""
+        while True:
+            await asyncio.sleep(30)
+            try:
+                if (self.usage.get("five_hour") or 0) > 0.9:
+                    continue
+                for w in watchers.due():
+                    watchers.update(w["id"], last_run=time.time())  # don't re-queue while running
+                    asyncio.create_task(self.run_watcher(w))
+            except Exception:
+                log.exception("watcher scheduler")
+
     async def reap_idle(self) -> None:
         while True:
             await asyncio.sleep(60)
@@ -315,6 +345,7 @@ class Daemon:
         log.info("listening on %s", paths.SOCKET)
         asyncio.create_task(self.reap_idle())
         asyncio.create_task(self.watch_theme())
+        asyncio.create_task(self.schedule_watchers())
         async with server:
             await server.serve_forever()
 
