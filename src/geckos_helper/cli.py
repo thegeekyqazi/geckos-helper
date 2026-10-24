@@ -130,6 +130,9 @@ def main() -> None:
     hx = sub.add_parser("handoff", help="copy a chat to the clipboard to continue elsewhere")
     hx.add_argument("chat", nargs="?", help="chat id (default: most recent)")
     hx.add_argument("--brief", action="store_true", help="have a small model write a hand-off brief")
+    cal = sub.add_parser("calendar", help="calendars: login (Google), list, or show the next days")
+    cal.add_argument("action", choices=["login", "list", "show"], nargs="?", default="show")
+    cal.add_argument("--days", type=int, default=3)
     th = sub.add_parser("theme", help="show, switch (name) or cycle (next/prev) panel themes")
     th.add_argument("name", nargs="?")
     ep = sub.add_parser("end4-patch", help="(re)apply the end-4 add-ons and keybinds after an end-4 update")
@@ -179,6 +182,20 @@ def main() -> None:
                     r = await client.call("export", chat=chat, mode="brief" if args.brief else "transcript")
                     print(f"copied {r['chars']} characters; paste into Claude.ai or anywhere")
                 asyncio.run(handoff())
+            case "calendar":
+                from .desktop import calendar, calendar_google
+                if args.action == "login":
+                    calendar_google.login()
+                    print("Google Calendar connected. Calendars: "
+                          + ", ".join(c["name"] for c in calendar.calendars()))
+                elif args.action == "list":
+                    for c in calendar.calendars():
+                        print(f"{'rw' if c['writable'] else 'ro'}  {c['name']}  ({c['id']})")
+                else:
+                    for e in calendar.events(args.days):
+                        print(f"{e['start'][:16].replace('T', ' ')}  {e['title']}  [{e['calendar']}]")
+                    for err in calendar.last_errors:
+                        print(f"error: {err}")
             case "theme":
                 from . import theme
                 if args.name in ("next", "prev"):
