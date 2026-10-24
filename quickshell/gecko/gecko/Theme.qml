@@ -24,14 +24,14 @@ Singleton {
     readonly property color text: t.text ?? Appearance.colors.colOnLayer0
     readonly property color textMuted: t.text_muted ?? Appearance.colors.colSubtext
     readonly property color accent: t.accent ?? Appearance.colors.colPrimary
-    readonly property color onAccent: t.on_accent ?? Appearance.colors.colOnPrimary
+    readonly property color accentText: t.on_accent ?? Appearance.colors.colOnPrimary
     readonly property color userBubble: t.user_bubble ?? Appearance.colors.colLayer2
-    readonly property color onUserBubble: t.on_user_bubble ?? Appearance.colors.colOnLayer2
+    readonly property color userBubbleText: t.on_user_bubble ?? Appearance.colors.colOnLayer2
     readonly property color toolBg: t.tool_bg ?? Appearance.colors.colLayer1
     readonly property color permissionBg: t.permission_bg ?? Appearance.colors.colTertiaryContainer
-    readonly property color onPermission: t.on_permission ?? Appearance.colors.colOnTertiaryContainer
+    readonly property color permissionText: t.on_permission ?? Appearance.colors.colOnTertiaryContainer
     readonly property color errorBg: t.error_bg ?? Appearance.colors.colErrorContainer
-    readonly property color onError: t.on_error ?? Appearance.colors.colOnErrorContainer
+    readonly property color errorText: t.on_error ?? Appearance.colors.colOnErrorContainer
     readonly property color composerBg: t.composer_bg ?? Appearance.colors.colLayer2
     readonly property color codeBg: t.code_bg ?? Appearance.colors.colLayer2
 
@@ -42,7 +42,7 @@ Singleton {
     readonly property string monoFont: t.mono_font || Appearance.font.family.monospace
     readonly property real fontSize: t.font_size ?? 15
     readonly property real width: t.width ?? 470
-    readonly property bool onRight: t.side === "right"
+    readonly property bool rightSide: t.side === "right"
     readonly property string assistantName: t.assistant_name ?? "Gecko"
     readonly property string avatar: t.avatar ?? "🦎"
 
