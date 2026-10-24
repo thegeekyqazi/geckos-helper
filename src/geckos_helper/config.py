@@ -27,6 +27,11 @@ obsidian_vault = "~/stuff/Obsidian/Vault 0"
 obsidian_inbox = "Gecko/Inbox.md"   # where captured ideas go, relative to the vault
 weather_city = ""                   # empty = located from your IP, like end-4's bar
 
+# Google Calendar (read/write): see README, then `gecko calendar login`.
+[calendar.google]
+calendars = []   # names or ids to show; empty = all your Google calendars
+write_to = ""    # calendar for new events; empty = your primary calendar
+
 # Read-only calendar feeds (.ics). For Outlook: Settings > Calendar >
 # Shared calendars > Publish a calendar > copy the ICS link.
 # [[calendar.ics]]
@@ -46,7 +51,8 @@ CAPABILITIES: dict[str, str] = {
     "clipboard_write": "Copy text to the clipboard (e.g. a hand-off brief)",
     "obsidian_read": "Search and read your Obsidian vault",
     "obsidian_write": "Create notes and append ideas in the vault",
-    "calendar_read": "Read events from your calendar feeds",
+    "calendar_read": "Read events from your calendars",
+    "calendar_write": "Add, change and delete events on your Google Calendar",
     "handoff": "Open a full Claude Code session in a terminal",
     "chat_search": "Search your past Gecko chats",
     "weather": "Current weather and the forecast",
