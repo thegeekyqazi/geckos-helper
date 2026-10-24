@@ -20,6 +20,9 @@ still open end-4's).
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**
 - Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
+- **Activity** page: everything Gecko did, who approved it, watchers and goal progress
+- **Memory** page: what Gecko remembers (Claude Code's own memory), plus search across all chats
+- **Mascot** in a screen corner: idle, working, or a badge when an approval is waiting (click it)
 - **Hand-off**: copy a chat, or a short model-written brief, to paste into Claude.ai
   (panel menu, `gecko handoff [--brief]`, or just ask Gecko to hand it off)
 - Chat history, capability switches, kill switch, 5-hour / 7-day usage bars
@@ -79,8 +82,13 @@ still open end-4's).
   `~/.local/state/geckos-helper/actions.jsonl`.
 - **No retry loops:** after you deny an action, an identical request in the same
   turn is denied automatically and the agent is told not to work around it.
-- **"Allow for this chat"** remembers the tool for that chat only; for shell
-  commands it remembers the exact command, never a whole program.
+- **"This chat"** remembers the tool for that chat only; for shell commands it
+  remembers the exact command, never a whole program.
+- **"Always"** saves a rule to `~/.config/geckos-helper/permission-rules.json`:
+  glob patterns like `Bash:git status*`, allow or deny, last match wins.
+- **Watchers are read-only**: they can search the web and read the weather,
+  calendar, to-dos and vault, then notify you. They have no shell, no file edits,
+  and anything not pre-approved is denied without asking.
 
 ## Install
 
@@ -120,12 +128,12 @@ url = "https://outlook.office365.com/owa/calendar/.../calendar.ics"
 - [x] Quickshell panel on Super+A with tool cards, approve/deny, history, model picker, usage meter
 - [x] end-4 to-do widget picks up agent edits (small re-appliable patch)
 - [x] Chat-app redesign, Lua themes with live reload, theme switcher, context hand-off
-- [ ] "Always allow" permission rules, editable in settings
-- [ ] Activity page: audit trail of everything Gecko did and what's scheduled
-- [ ] Memory: Claude Code's own memory, viewable/editable in the panel, plus search across past chats
-- [ ] Watchers: read-only background checks that notify you ("tell me if it'll rain before class")
-- [ ] Goals: turn a goal into a tracked plan in Obsidian with progress and next steps
-- [ ] Desktop mascot showing idle / working / needs-approval
+- [x] "Always allow" permission rules, editable in settings
+- [x] Activity page: audit trail of everything Gecko did and what's scheduled
+- [x] Memory: Claude Code's own memory, viewable/editable in the panel, plus search across past chats
+- [x] Watchers: read-only background checks that notify you ("tell me if it'll rain before class")
+- [x] Goals: turn a goal into a tracked plan in Obsidian with progress and next steps
+- [x] Desktop mascot showing idle / working / needs-approval
 - [ ] Writable calendar: Google Calendar (read/write) behind a provider layer (DavMail later if Laurier ICT allows) + calendar widget
 - [ ] Safety: injection classifier, read-only profile for unattended runs
 - [ ] Scheduler recipes, event triggers, activity inbox, usage budget, daily briefing
