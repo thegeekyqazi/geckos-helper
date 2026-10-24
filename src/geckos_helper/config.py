@@ -50,6 +50,7 @@ CAPABILITIES: dict[str, str] = {
     "handoff": "Open a full Claude Code session in a terminal",
     "chat_search": "Search your past Gecko chats",
     "weather": "Current weather and the forecast",
+    "watchers": "Create and manage background watchers",
 }
 DEFAULT_OFF = {"clipboard_read"}
 

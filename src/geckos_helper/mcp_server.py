@@ -12,7 +12,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import handoff_export, paths
+from . import handoff_export, paths, watchers
 from .config import load_state
 from .desktop import calendar, obsidian, system, todo, untrusted
 from .desktop import weather as weather_mod
@@ -204,6 +204,37 @@ def obsidian_write_note(path: str, content: str, overwrite: bool = False) -> str
 def obsidian_append(path: str, content: str) -> str:
     """Append text to the end of a note, creating it if needed."""
     return obsidian.append(path, content)
+
+
+# --- watchers ---------------------------------------------------------------
+
+@server.tool()
+@gated("watchers", writes=True)
+def watch_create(name: str, prompt: str, every_minutes: int | None = None,
+                 daily_at: list[str] | None = None) -> dict:
+    """Create a background watcher: a read-only check that notifies the user when it matters.
+
+    `prompt` says what to check and when to notify ("Notify me if rain is likely
+    between 8 and 9 tomorrow"). Schedule with every_minutes (15 or more) or daily_at
+    times like ["07:30"]. Watchers can search the web, read the weather, calendar,
+    to-dos and vault; they can never act.
+    """
+    return watchers.describe(watchers.create(name, prompt, every_minutes, daily_at))
+
+
+@server.tool()
+@gated("watchers")
+def watch_list() -> list[dict]:
+    """The user's watchers with schedule, next run and last result."""
+    return [watchers.describe(w) for w in watchers.load()]
+
+
+@server.tool()
+@gated("watchers", writes=True)
+def watch_delete(watcher_id: str) -> str:
+    """Delete a watcher by id (from watch_list)."""
+    watchers.remove(watcher_id)
+    return "deleted"
 
 
 # --- past chats --------------------------------------------------------------
