@@ -55,5 +55,5 @@ in sync when the status changes.
 
 The **Project check-in** recipe (Mon and Thu, 08:30) and the **Daily briefing**
 can suggest to-dos. They show in the Inbox with checkboxes; **Add N to to-dos**
-puts the ones you tick on your to-do list (desktop widget and end-4's sidebar
-included). Suggestions from a report the injection guard flagged are dropped.
+puts the ones you tick on your to-do list (end-4's sidebar, and the desktop widget
+if you use Gecko's dots). Suggestions from a report the injection guard flagged are dropped.

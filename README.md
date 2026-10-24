@@ -39,7 +39,8 @@ wallpaper colors through symlinks, so it looks native but end-4 updates never
 overwrite it. It replaces end-4's left sidebar on **Super+A** and on the bar's ✦ AI
 button (right-click the button, or Super+B / Super+O, for end-4's own sidebar).
 
-Works with the desktop widgets from [Gecko's dots](https://github.com/thegeekyqazi/geckos-dots):
+Works on its own with end-4. **Optionally** pairs with the desktop widgets from
+[Gecko's dots](https://github.com/thegeekyqazi/geckos-dots):
 the to-do and notes widgets share Gecko's files, and the calendar widget reads the
 shared feed `~/.local/state/geckos-helper/calendar.json` (refreshed every 10 minutes)
 to show your events.
