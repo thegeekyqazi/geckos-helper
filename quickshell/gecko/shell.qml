@@ -17,6 +17,7 @@ ShellRoot {
     ThemeLoader {}
 
     GeckoPanel {}
+    Mascot {}
 
     IpcHandler {
         target: "gecko"
