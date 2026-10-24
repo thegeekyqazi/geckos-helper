@@ -77,6 +77,12 @@ Rectangle {
             onClicked: { Gecko.page = "activity"; root.shown = false; }
         }
         MenuItem {
+            iconName: "neurology"
+            label: "Memory"
+            hint: "What Gecko remembers about you"
+            onClicked: { Gecko.page = "memory"; root.shown = false; }
+        }
+        MenuItem {
             iconName: "tune"
             label: "Settings"
             hint: "What Gecko can access"

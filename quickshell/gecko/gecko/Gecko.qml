@@ -329,6 +329,15 @@ Singleton {
         root.call("watchers", { remove: id }, r => root.watchers = r.watchers);
     }
 
+    property var memories: []
+    property string memoryDir: ""
+    function refreshMemories() {
+        root.call("memories", {}, r => { root.memories = r.memories; root.memoryDir = r.dir; });
+    }
+    function deleteMemory(file) {
+        root.call("memories", { remove: file }, r => root.memories = r.memories);
+    }
+
     property var rules: []
     function refreshRules() {
         root.call("rules", {}, r => root.rules = r.rules);
