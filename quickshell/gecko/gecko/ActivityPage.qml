@@ -31,6 +31,10 @@ StyledFlickable {
             return { icon: e.notified ? "notifications_active" : "visibility",
                      title: `${e.name}: ${e.message || (e.error ? "failed" : "nothing to report")}`,
                      detail: e.error ? `error: ${e.error}` : "watcher run" };
+        case "guard":
+            return { icon: "gpp_maybe", title: e.source === "you" ? "Guard warning cleared"
+                                                 : `Possible prompt injection in ${e.source}`,
+                     detail: (e.reasons ?? []).join(", ") };
         case "goal":
             return { icon: "flag", title: `${e.goal}: ${e.note}`, detail: "goal update" };
         }
