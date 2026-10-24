@@ -121,6 +121,16 @@ PanelWindow {
             }
         }
 
+        Rectangle { // Unread inbox report
+            visible: Gecko.inboxUnread > 0 && !root.needsYou
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            width: 10
+            height: 10
+            radius: 5
+            color: Theme.accent
+        }
+
         HoverHandler { id: hover }
         TapHandler {
             onTapped: {
