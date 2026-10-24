@@ -144,6 +144,10 @@ Singleton {
         case "activity":
             if (root.page === "activity") root.refreshActivity();
             return;
+        case "inbox":
+            root.inboxUnread = ev.unread;
+            if (root.page === "inbox") root.refreshInbox();
+            return;
         case "chat_updated":
             if (ev.chat === root.chatId && ev.model) root.chatModel = ev.model;
             return;
@@ -266,6 +270,7 @@ Singleton {
 
     function refreshAll() {
         root.refreshChats();
+        root.refreshInbox();
         root.call("models", {}, r => {
             root.models = r.models;
             root.defaultModel = r.default;
@@ -275,7 +280,12 @@ Singleton {
             root.capabilities = r.capabilities;
             root.capabilityDescriptions = r.capability_descriptions;
             if (r.usage) root.usage = r.usage;
+            root.budget = r.budget ?? {};
         });
+    }
+
+    function refreshStatus() {
+        root.call("status", {}, r => root.budget = r.budget ?? {});
     }
 
     function refreshChats() {
@@ -364,6 +374,26 @@ Singleton {
         root.call("kill", { on: on });
     }
 
+    property var inboxItems: []
+    property int inboxUnread: 0
+    property var recipes: []
+    property var budget: ({})
+    function refreshInbox() {
+        root.call("inbox", {}, r => { root.inboxItems = r.items; root.inboxUnread = r.unread; });
+    }
+    function markRead(id) {
+        root.call("inbox", { read: id }, r => { root.inboxItems = r.items; root.inboxUnread = r.unread; });
+    }
+    function deleteInboxItem(id) {
+        root.call("inbox", { remove: id }, r => { root.inboxItems = r.items; root.inboxUnread = r.unread; });
+    }
+    function setRecipe(id, on) {
+        root.call("recipes", on ? { enable: id } : { disable: id }, r => root.recipes = r.recipes);
+    }
+    function runRecipe(id) {
+        root.call("recipes", { run: id }, r => root.recipes = r.recipes);
+    }
+
     property var activity: []
     property var watchers: []
     property var goals: []
@@ -371,6 +401,7 @@ Singleton {
         root.call("activity", { limit: 150 }, r => root.activity = r.entries);
         root.call("watchers", {}, r => root.watchers = r.watchers);
         root.call("goals", {}, r => root.goals = r.goals);
+        root.call("recipes", {}, r => root.recipes = r.recipes);
     }
     function deleteWatcher(id) {
         root.call("watchers", { remove: id }, r => root.watchers = r.watchers);
