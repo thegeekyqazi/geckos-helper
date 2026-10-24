@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from . import activity, config, context, handoff_export, paths, rules, theme
+from . import activity, config, context, handoff_export, memory, paths, rules, theme
 from .backends.claude import ClaudeBackend
 from .store import Store
 
@@ -233,6 +233,15 @@ class Daemon:
             text = handoff_export.transcript(self.store, req["chat"])
         await asyncio.to_thread(handoff_export.to_clipboard, text)
         return {"chars": len(text)}
+
+    async def op_search(self, req: dict) -> dict:
+        return {"results": self.store.search(req["query"], req.get("limit", 30))}
+
+    async def op_memories(self, req: dict) -> dict:
+        """No args: list Gecko's memories. remove=<file>: delete one."""
+        if req.get("remove"):
+            memory.delete(req["remove"])
+        return {"memories": memory.list_memories(), "dir": str(memory.memory_dir())}
 
     async def op_rules(self, req: dict) -> dict:
         """No args: list. match+action: add. remove=<index>: delete."""
