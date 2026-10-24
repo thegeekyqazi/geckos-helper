@@ -34,7 +34,7 @@ to show your events.
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
 - **Projects** page: your vault's projects and goals with progress and next task, plus your ideas list
 - **Inbox** for recipe reports (the daily briefing arrives at 8:00), with an unread badge
-- **Activity** page: everything Gecko did, who approved it, watchers and goal progress
+- **Activity** page: everything Gecko did, who approved it, watchers and recipes
 - **Memory** page: what Gecko remembers (Claude Code's own memory), plus search across all chats
 - **Mascot** in a screen corner: idle, working, or a badge when an approval is waiting (click it)
 - **Hand-off**: copy a chat, or a short model-written brief, to paste into Claude.ai
