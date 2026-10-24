@@ -3,10 +3,10 @@
     "tell me if it'll rain before my 8:30 class"
     "let me know when the CP363 midterm grade is posted"
 
-Each run is a one-shot `claude -p` that can only use web search/fetch and Gecko's
-read-only desktop tools: no shell, no file edits, and anything not pre-approved is
-denied without asking (--permission-mode dontAsk). A watcher can notify you; it can
-never act. Watchers live in ~/.local/share/geckos-helper/watchers.json, shared by the
+Each run uses the read-only `unattended` profile (see profiles.py): web search,
+web fetch only for the domains the watcher lists, and Gecko's read-only desktop
+tools, with the MCP server itself refusing writes. A watcher can notify you; it can
+never act. Its message is scanned by the injection guard before it reaches you. Watchers live in ~/.local/share/geckos-helper/watchers.json, shared by the
 daemon (which runs them) and the MCP server (which lets the agent create them).
 """
 
@@ -18,18 +18,12 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from . import activity, paths
-from .config import expand, load_config, load_state
+from . import activity, guard, paths, profiles
+from .config import load_state
 from .desktop import system
 
 WATCHERS_FILE = paths.DATA_DIR / "watchers.json"
 MIN_INTERVAL_MINUTES = 15
-READ_ONLY_TOOLS = [
-    "WebSearch", "WebFetch",
-    "mcp__gecko__calendar_events", "mcp__gecko__system_status", "mcp__gecko__todo_list",
-    "mcp__gecko__obsidian_search", "mcp__gecko__obsidian_read", "mcp__gecko__obsidian_open_tasks",
-    "mcp__gecko__media_now_playing", "mcp__gecko__chat_search", "mcp__gecko__weather",
-]
 
 PROMPT = """You are a background watcher for Gecko's Helper, running unattended on the
 user's laptop. Nobody is reading this conversation.
@@ -63,7 +57,8 @@ def save(watchers: list[dict]) -> None:
 
 
 def create(name: str, prompt: str, every_minutes: int | None = None,
-           daily_at: list[str] | None = None, model: str = "haiku") -> dict:
+           daily_at: list[str] | None = None, model: str = "haiku",
+           fetch_domains: list[str] | None = None) -> dict:
     if not every_minutes and not daily_at:
         raise ValueError("Give every_minutes or daily_at (e.g. ['07:30'])")
     if every_minutes and every_minutes < MIN_INTERVAL_MINUTES:
@@ -72,7 +67,8 @@ def create(name: str, prompt: str, every_minutes: int | None = None,
         if not re.fullmatch(r"\d{2}:\d{2}", t):
             raise ValueError(f"daily_at times must look like 07:30, got {t!r}")
     w = {"id": uuid.uuid4().hex[:8], "name": name, "prompt": prompt, "every_minutes": every_minutes,
-         "daily_at": daily_at or [], "model": model, "created": time.time(), "last_run": None,
+         "daily_at": daily_at or [], "model": model, "fetch_domains": fetch_domains or [],
+         "created": time.time(), "last_run": None,
          "last_result": None, "paused": False}
     save(load() + [w])
     return w
@@ -128,15 +124,10 @@ def _parse(text: str) -> dict:
 
 async def run(w: dict) -> dict:
     """Run one watcher now. Notifies on `notify: true`; never takes actions."""
-    cfg = load_config()
-    claude = str(expand(cfg["agents"]["claude"]["path"]))
     prompt = PROMPT.format(prompt=w["prompt"], now=datetime.now().strftime("%A %Y-%m-%d %H:%M"),
                            last=json.dumps(w.get("last_result")) if w.get("last_result") else "nothing yet")
     proc = await asyncio.create_subprocess_exec(
-        claude, "-p", "--model", w.get("model") or "haiku",
-        "--tools", "WebSearch,WebFetch", "--allowedTools", ",".join(READ_ONLY_TOOLS),
-        "--permission-mode", "dontAsk", "--setting-sources", "",
-        "--mcp-config", str(paths.MCP_CONFIG_FILE), "--no-session-persistence",
+        *profiles.unattended_argv(w.get("model") or "haiku", w.get("fetch_domains")),
         cwd=paths.WORKSPACE, stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     entry: dict[str, Any] = {"name": w["name"], "watcher": w["id"]}
@@ -147,6 +138,10 @@ async def run(w: dict) -> dict:
         result = _parse(out.decode())
         entry |= {"notified": bool(result.get("notify")), "title": result.get("title", ""),
                   "message": result.get("message", "")}
+        verdict = await guard.scan(f"{entry['title']}\n{entry['message']}")
+        if verdict.suspicious:  # never pass an injection on to you as if it were Gecko speaking
+            entry |= {"title": "Blocked a suspicious result", "guard": verdict.reasons,
+                      "message": "This watcher's result looked like a prompt injection; see Activity."}
         if entry["notified"]:
             system.send_notification(f"🦎 {entry['title'] or w['name']}", entry["message"])
         update(w["id"], last_run=time.time(), last_result=result)
