@@ -15,15 +15,14 @@ import json
 import re
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
-from . import activity, guard, paths, profiles
+from . import activity, guard, paths, profiles, schedule
 from .config import load_state
 from .desktop import system
 
 WATCHERS_FILE = paths.DATA_DIR / "watchers.json"
-MIN_INTERVAL_MINUTES = 15
 
 PROMPT = """You are a background watcher for Gecko's Helper, running unattended on the
 user's laptop. Nobody is reading this conversation.
@@ -59,13 +58,7 @@ def save(watchers: list[dict]) -> None:
 def create(name: str, prompt: str, every_minutes: int | None = None,
            daily_at: list[str] | None = None, model: str = "haiku",
            fetch_domains: list[str] | None = None) -> dict:
-    if not every_minutes and not daily_at:
-        raise ValueError("Give every_minutes or daily_at (e.g. ['07:30'])")
-    if every_minutes and every_minutes < MIN_INTERVAL_MINUTES:
-        raise ValueError(f"every_minutes must be at least {MIN_INTERVAL_MINUTES}")
-    for t in daily_at or []:
-        if not re.fullmatch(r"\d{2}:\d{2}", t):
-            raise ValueError(f"daily_at times must look like 07:30, got {t!r}")
+    schedule.validate({"every_minutes": every_minutes, "daily_at": daily_at})
     w = {"id": uuid.uuid4().hex[:8], "name": name, "prompt": prompt, "every_minutes": every_minutes,
          "daily_at": daily_at or [], "model": model, "fetch_domains": fetch_domains or [],
          "created": time.time(), "last_run": None,
@@ -89,26 +82,11 @@ def update(watcher_id: str, **fields: Any) -> None:
 def next_run(w: dict, now: float | None = None) -> float | None:
     if w.get("paused"):
         return None
-    now = now or time.time()
-    last = w.get("last_run") or w.get("created") or now
-    if w.get("every_minutes"):
-        return last + w["every_minutes"] * 60 if w.get("last_run") else now  # first run right away
-    candidates = []
-    base = datetime.fromtimestamp(max(last, now - 60))
-    for t in w.get("daily_at", []):
-        h, m = map(int, t.split(":"))
-        at = base.replace(hour=h, minute=m, second=0, microsecond=0)
-        if at.timestamp() <= last:
-            at += timedelta(days=1)
-        candidates.append(at.timestamp())
-    return min(candidates) if candidates else None
+    return schedule.next_run(w, w.get("last_run"), w.get("created"), now)
 
 
 def schedule_text(w: dict) -> str:
-    if w.get("every_minutes"):
-        m = w["every_minutes"]
-        return f"every {m // 60} h" if m % 60 == 0 else f"every {m} min"
-    return "daily at " + ", ".join(w.get("daily_at", []))
+    return schedule.describe(w)
 
 
 def describe(w: dict) -> dict:
