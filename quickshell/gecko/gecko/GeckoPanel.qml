@@ -121,6 +121,29 @@ PanelWindow {
             }
         }
 
+        Rectangle { // Toast: short confirmations from slash commands etc.
+            z: 30
+            visible: opacity > 0
+            opacity: Gecko.toast ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 180 } }
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 92
+            implicitWidth: Math.min(parent.width - 40, toastText.implicitWidth + 28)
+            implicitHeight: toastText.implicitHeight + 14
+            radius: height / 2
+            color: Theme.accent
+            GText {
+                id: toastText
+                anchors.centerIn: parent
+                width: Math.min(implicitWidth, parent.parent.width - 68)
+                horizontalAlignment: Text.AlignHCenter
+                text: Gecko.toast
+                color: Theme.accentText
+                rel: 0.85
+            }
+        }
+
         PanelMenu {
             id: menu
             anchors.top: parent.top
