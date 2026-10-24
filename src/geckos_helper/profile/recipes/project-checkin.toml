@@ -1,0 +1,15 @@
+name = "Project check-in"
+description = "Twice a week: where each project stands, what's stalled, and suggested to-dos"
+weekly_at = ["mon 08:30", "thu 08:30"]
+model = "sonnet"
+output = "inbox"
+enabled = true
+prompt = """Check in on my projects and goals (project_list, project_next_actions,
+ideas_list) and my calendar for the next 7 days.
+1. **Moving**: active projects with progress since the last check-in.
+2. **Stalled**: active projects with no progress-log entry for 7+ days, or tasks past
+   their due date. Say what's blocking if you can tell.
+3. **Coming up**: project tasks due in the next 7 days, alongside busy days on my calendar.
+4. **Ideas**: if my ideas list has something that fits a quiet week, mention one.
+Then suggest up to 5 concrete to-dos for the next few days (gecko-todos block),
+small enough to finish in one sitting, tied to the projects above."""
