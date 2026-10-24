@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS entries_chat ON entries(chat_id, ts);
 CREATE TABLE IF NOT EXISTS inbox (
     id TEXT PRIMARY KEY, ts REAL, source TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0,
-    flagged INTEGER DEFAULT 0
+    flagged INTEGER DEFAULT 0, todos TEXT DEFAULT '[]'
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(chat_id UNINDEXED, kind UNINDEXED, text);
 """
@@ -44,8 +44,11 @@ class Store:
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(chats)")}
         if "model" not in cols:  # added after 0.1
             self.db.execute("ALTER TABLE chats ADD COLUMN model TEXT")
-        if "flagged" not in {r["name"] for r in self.db.execute("PRAGMA table_info(inbox)")}:
+        inbox_cols = {r["name"] for r in self.db.execute("PRAGMA table_info(inbox)")}
+        if "flagged" not in inbox_cols:
             self.db.execute("ALTER TABLE inbox ADD COLUMN flagged INTEGER DEFAULT 0")
+        if "todos" not in inbox_cols:  # suggested to-dos the user can add with one click
+            self.db.execute("ALTER TABLE inbox ADD COLUMN todos TEXT DEFAULT '[]'")
         if not self.db.execute("SELECT 1 FROM entries_fts LIMIT 1").fetchone():  # backfill search index
             for r in self.db.execute("SELECT chat_id, kind, data FROM entries WHERE kind IN (?, ?)", SEARCHABLE_KINDS):
                 self.db.execute("INSERT INTO entries_fts VALUES (?,?,?)",
@@ -91,18 +94,24 @@ class Store:
 
     # --- inbox: reports from recipes (daily briefing etc.) ------------------
 
-    def inbox_add(self, source: str, title: str, body: str, flagged: bool = False) -> dict:
-        """flagged: the injection guard found something; the panel won't paste it into a chat."""
+    def inbox_add(self, source: str, title: str, body: str, flagged: bool = False,
+                  todos: list[str] | None = None) -> dict:
+        """flagged: the injection guard found something; the panel won't paste it into a chat.
+        todos: suggested to-dos shown with checkboxes and an "Add selected" button."""
         item = {"id": uuid.uuid4().hex[:12], "ts": time.time(), "source": source, "title": title,
-                "body": body, "read": 0, "flagged": int(flagged)}
-        self.db.execute("INSERT INTO inbox (id, ts, source, title, body, read, flagged) "
-                        "VALUES (:id,:ts,:source,:title,:body,:read,:flagged)", item)
+                "body": body, "read": 0, "flagged": int(flagged), "todos": json.dumps(todos or [])}
+        self.db.execute("INSERT INTO inbox (id, ts, source, title, body, read, flagged, todos) "
+                        "VALUES (:id,:ts,:source,:title,:body,:read,:flagged,:todos)", item)
         self.db.commit()
         return item
 
     def inbox(self, limit: int = 50) -> list[dict]:
         rows = self.db.execute("SELECT * FROM inbox ORDER BY ts DESC LIMIT ?", (limit,))
-        return [dict(r) for r in rows]
+        return [{**dict(r), "todos": json.loads(r["todos"] or "[]")} for r in rows]
+
+    def inbox_set_todos(self, item_id: str, todos: list[str]) -> None:
+        self.db.execute("UPDATE inbox SET todos=? WHERE id=?", (json.dumps(todos), item_id))
+        self.db.commit()
 
     def inbox_unread(self) -> int:
         return self.db.execute("SELECT COUNT(*) FROM inbox WHERE read=0").fetchone()[0]
