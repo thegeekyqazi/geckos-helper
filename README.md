@@ -20,6 +20,7 @@ still open end-4's).
 - Permission cards: **Allow**, **Allow for this chat**, **Deny**
 - Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
+- **Inbox** for recipe reports (the daily briefing arrives at 8:00), with an unread badge
 - **Activity** page: everything Gecko did, who approved it, watchers and goal progress
 - **Memory** page: what Gecko remembers (Claude Code's own memory), plus search across all chats
 - **Mascot** in a screen corner: idle, working, or a badge when an approval is waiting (click it)
@@ -164,7 +165,7 @@ there, Gecko gives you the details to add in Outlook.
 - [x] Calendar layer (ICS + Google read/write), clash check, calendar page in the panel
 - [ ] DavMail / CalDAV provider for Outlook writes, only if Laurier ICT approves
 - [x] Safety: injection guard with chat tainting, read-only profile for unattended runs
-- [ ] Scheduler recipes, event triggers, activity inbox, usage budget, daily briefing
+- [x] Recipes (TOML) on schedules and event triggers, inbox, usage budget, daily briefing; see [docs/RECIPES.md](docs/RECIPES.md)
 - [ ] Obsidian project tracking: ideas → projects → auto-generated to-dos, progress reviews
 - [ ] Desktop context buttons (clipboard, focused window, screenshot region), quick-ask keybind
 - [ ] Codex and OpenCode backends (ACP)
