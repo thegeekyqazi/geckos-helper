@@ -35,6 +35,14 @@ StyledFlickable {
             return { icon: "gpp_maybe", title: e.source === "you" ? "Guard warning cleared"
                                                  : `Possible prompt injection in ${e.source}`,
                      detail: (e.reasons ?? []).join(", ") };
+        case "recipe":
+            return { icon: e.flagged ? "gpp_maybe" : "auto_awesome",
+                     title: `${e.name}: ${e.error ? "failed" : e.title ? e.title : "nothing to report"}`,
+                     detail: e.error ? `error: ${e.error}` : e.trigger ? `triggered: ${e.trigger}` : "recipe run" };
+        case "trigger":
+            return { icon: "bolt", title: `Trigger: ${e.recipe}`, detail: e.why };
+        case "budget":
+            return { icon: "hourglass_top", title: "Background work paused", detail: e.reason };
         case "goal":
             return { icon: "flag", title: `${e.goal}: ${e.note}`, detail: "goal update" };
         }
@@ -80,6 +88,42 @@ StyledFlickable {
                     onClicked: Gecko.deleteWatcher(watchRow.modelData.id)
                 }
             }
+        }
+
+        Section { text: "Recipes"; visible: Gecko.recipes.length > 0 }
+        Repeater {
+            model: Gecko.recipes
+            delegate: RowLayout {
+                id: recipeRow
+                required property var modelData
+                Layout.fillWidth: true
+                spacing: 6
+                Entry {
+                    Layout.fillWidth: true
+                    iconName: "auto_awesome"
+                    title: recipeRow.modelData.name
+                    detail: recipeRow.modelData.error ? `error: ${recipeRow.modelData.error}`
+                        : recipeRow.modelData.schedule_text
+                          + (recipeRow.modelData.next_run ? ` · next ${root.when(recipeRow.modelData.next_run)}` : "")
+                }
+                IconButton {
+                    size: 28
+                    iconName: "play_arrow"
+                    tip: "Run now"
+                    onClicked: Gecko.runRecipe(recipeRow.modelData.id)
+                }
+                StyledSwitch {
+                    checked: recipeRow.modelData.enabled
+                    onClicked: Gecko.setRecipe(recipeRow.modelData.id, checked)
+                }
+            }
+        }
+        GText {
+            Layout.fillWidth: true
+            visible: Gecko.recipes.length > 0
+            text: "Edit or add recipes in ~/.config/geckos-helper/recipes/ (TOML), or ask Gecko to make one."
+            muted: true
+            rel: 0.7
         }
 
         Section { text: "Goals"; visible: Gecko.goals.length > 0 }
