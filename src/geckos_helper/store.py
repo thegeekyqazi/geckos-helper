@@ -21,7 +21,10 @@ CREATE TABLE IF NOT EXISTS entries (
     chat_id TEXT, ts REAL, kind TEXT, data TEXT
 );
 CREATE INDEX IF NOT EXISTS entries_chat ON entries(chat_id, ts);
+CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(chat_id UNINDEXED, kind UNINDEXED, text);
 """
+
+SEARCHABLE_KINDS = ("user_message", "agent_message")
 
 # Events worth keeping in the transcript (streaming chunks are not).
 TRANSCRIPT_KINDS = {"user_message", "agent_message", "tool_call", "tool_call_update", "permission_request",
@@ -37,6 +40,11 @@ class Store:
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(chats)")}
         if "model" not in cols:  # added after 0.1
             self.db.execute("ALTER TABLE chats ADD COLUMN model TEXT")
+        if not self.db.execute("SELECT 1 FROM entries_fts LIMIT 1").fetchone():  # backfill search index
+            for r in self.db.execute("SELECT chat_id, kind, data FROM entries WHERE kind IN (?, ?)", SEARCHABLE_KINDS):
+                self.db.execute("INSERT INTO entries_fts VALUES (?,?,?)",
+                                (r["chat_id"], r["kind"], json.loads(r["data"]).get("text", "")))
+            self.db.commit()
 
     def create(self, agent: str, model: str, title: str = "New chat", cwd: str | None = None) -> dict:
         now = time.time()
@@ -64,13 +72,29 @@ class Store:
     def delete(self, chat_id: str) -> None:
         self.db.execute("DELETE FROM chats WHERE id=?", (chat_id,))
         self.db.execute("DELETE FROM entries WHERE chat_id=?", (chat_id,))
+        self.db.execute("DELETE FROM entries_fts WHERE chat_id=?", (chat_id,))
         self.db.commit()
 
     def append(self, chat_id: str, kind: str, data: dict) -> None:
         if kind not in TRANSCRIPT_KINDS:
             return
         self.db.execute("INSERT INTO entries VALUES (?,?,?,?)", (chat_id, time.time(), kind, json.dumps(data)))
+        if kind in SEARCHABLE_KINDS:
+            self.db.execute("INSERT INTO entries_fts VALUES (?,?,?)", (chat_id, kind, data.get("text", "")))
         self.db.commit()
+
+    def search(self, query: str, limit: int = 20) -> list[dict]:
+        """Full-text search over past messages, best matches first."""
+        # Quote each word so punctuation in the query can't break FTS syntax
+        terms = " ".join('"' + w.replace('"', '') + '"' for w in query.split() if w.strip('"'))
+        if not terms:
+            return []
+        rows = self.db.execute(
+            "SELECT f.chat_id, f.kind, snippet(entries_fts, 2, '[', ']', ' … ', 16) AS snip, c.title, c.updated "
+            "FROM entries_fts f JOIN chats c ON c.id = f.chat_id "
+            "WHERE entries_fts MATCH ? ORDER BY rank LIMIT ?", (terms, limit))
+        return [{"chat": r["chat_id"], "kind": r["kind"], "snippet": r["snip"], "title": r["title"],
+                 "updated": r["updated"]} for r in rows]
 
     def transcript(self, chat_id: str) -> list[dict]:
         rows = self.db.execute("SELECT ts, kind, data FROM entries WHERE chat_id=? ORDER BY ts", (chat_id,))
