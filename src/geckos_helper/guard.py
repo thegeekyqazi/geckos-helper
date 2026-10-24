@@ -81,10 +81,12 @@ async def model_check(text: str) -> tuple[bool, str]:
     return bool(result.get("injection")), result.get("reason", "")
 
 
-async def scan(text: str) -> Verdict:
-    """Patterns first; one weak signal goes to the model when [guard] model_check is on."""
+async def scan(text: str, allow_model: bool = True) -> Verdict:
+    """Patterns first; one weak signal from third-party content goes to the model
+    when [guard] model_check is on."""
     v = scan_patterns(text)
-    if not v.suspicious and v.score == 1 and load_config().get("guard", {}).get("model_check", True):
+    if (allow_model and not v.suspicious and v.score == 1
+            and load_config().get("guard", {}).get("model_check", True)):
         try:
             injection, reason = await model_check(text)
             v.checked_by_model = True
