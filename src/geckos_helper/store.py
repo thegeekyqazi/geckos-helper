@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 CREATE INDEX IF NOT EXISTS entries_chat ON entries(chat_id, ts);
 CREATE TABLE IF NOT EXISTS inbox (
-    id TEXT PRIMARY KEY, ts REAL, source TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0
+    id TEXT PRIMARY KEY, ts REAL, source TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0,
+    flagged INTEGER DEFAULT 0
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(chat_id UNINDEXED, kind UNINDEXED, text);
 """
@@ -43,6 +44,8 @@ class Store:
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(chats)")}
         if "model" not in cols:  # added after 0.1
             self.db.execute("ALTER TABLE chats ADD COLUMN model TEXT")
+        if "flagged" not in {r["name"] for r in self.db.execute("PRAGMA table_info(inbox)")}:
+            self.db.execute("ALTER TABLE inbox ADD COLUMN flagged INTEGER DEFAULT 0")
         if not self.db.execute("SELECT 1 FROM entries_fts LIMIT 1").fetchone():  # backfill search index
             for r in self.db.execute("SELECT chat_id, kind, data FROM entries WHERE kind IN (?, ?)", SEARCHABLE_KINDS):
                 self.db.execute("INSERT INTO entries_fts VALUES (?,?,?)",
@@ -88,10 +91,12 @@ class Store:
 
     # --- inbox: reports from recipes (daily briefing etc.) ------------------
 
-    def inbox_add(self, source: str, title: str, body: str) -> dict:
+    def inbox_add(self, source: str, title: str, body: str, flagged: bool = False) -> dict:
+        """flagged: the injection guard found something; the panel won't paste it into a chat."""
         item = {"id": uuid.uuid4().hex[:12], "ts": time.time(), "source": source, "title": title,
-                "body": body, "read": 0}
-        self.db.execute("INSERT INTO inbox VALUES (:id,:ts,:source,:title,:body,:read)", item)
+                "body": body, "read": 0, "flagged": int(flagged)}
+        self.db.execute("INSERT INTO inbox (id, ts, source, title, body, read, flagged) "
+                        "VALUES (:id,:ts,:source,:title,:body,:read,:flagged)", item)
         self.db.commit()
         return item
 

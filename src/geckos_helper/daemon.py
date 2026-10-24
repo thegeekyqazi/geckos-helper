@@ -336,8 +336,8 @@ class Daemon:
             self.store.inbox_delete(req["remove"])
         return {"items": self.store.inbox(req.get("limit", 50)), "unread": self.store.inbox_unread()}
 
-    async def add_to_inbox(self, source: str, title: str, body: str) -> dict:
-        item = self.store.inbox_add(source, title, body)
+    async def add_to_inbox(self, source: str, title: str, body: str, flagged: bool = False) -> dict:
+        item = self.store.inbox_add(source, title, body, flagged)
         await self.broadcast({"event": "inbox", "item": item, "unread": self.store.inbox_unread()})
         return item
 
