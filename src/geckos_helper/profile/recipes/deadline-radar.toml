@@ -1,0 +1,10 @@
+name = "Deadline radar"
+description = "Evening heads-up about anything due in the next 48 hours"
+daily_at = ["20:00"]
+model = "haiku"
+output = "notify"
+enabled = false
+prompt = """Find anything due in the next 48 hours: tests, exams, assignments, quizzes and
+deadlines from my calendars, open Obsidian tasks with due dates, and my to-dos.
+If there is something, list each item with when it's due, most urgent first.
+If nothing is due in the next 48 hours, reply NOTHING."""

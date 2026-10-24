@@ -1,0 +1,11 @@
+name = "Weekly review"
+description = "Sunday recap of the week and a plan for the next one"
+weekly_at = ["sun 18:00"]
+model = "sonnet"
+output = "inbox"
+enabled = false
+prompt = """Write my weekly review:
+1. **Done this week**: completed Obsidian tasks and goal progress from the last 7 days.
+2. **Still open**: overdue or slipping items.
+3. **Next week**: the main events and deadlines from my calendars.
+4. **Priorities**: three suggested priorities for the week, tied to my goals."""

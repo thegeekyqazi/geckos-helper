@@ -1,0 +1,15 @@
+name = "Daily briefing"
+description = "Your day at a glance: schedule, what's due, weather, goals"
+daily_at = ["08:00"]
+model = "sonnet"
+output = "both"
+enabled = true
+prompt = """Write my morning briefing for today. Sections (skip any that are empty):
+1. **Today**: my schedule from all calendars, with times and places. Flag tests,
+   exams and deadlines.
+2. **Due soon**: anything due in the next 3 days from my calendars, Obsidian tasks
+   (obsidian_open_tasks) and my to-do list.
+3. **Weather**: today's weather, especially rain and temperature when I'm likely out.
+4. **Goals**: the next step for each active goal (goal_list).
+5. **Suggestion**: one concrete thing to focus on today.
+Keep it short and scannable."""
