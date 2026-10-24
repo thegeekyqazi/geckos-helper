@@ -1,10 +1,13 @@
 # Gecko's Helper
 
-A desktop agent for the [end-4 / illogical-impulse](https://github.com/end-4/dots-hyprland)
-Hyprland shell. It drives the coding-agent CLIs you already pay for (Claude Code
-first; Codex and OpenCode planned) instead of API keys. It gives them safe,
-toggleable access to your desktop: to-dos, notifications, calendar, Obsidian
-vault, media and system info.
+**A desktop agent that runs on Claude Code with your subscription as the backend.
+No API key needed. Made for [end-4](https://github.com/end-4/dots-hyprland).**
+
+Gecko lives in a panel on your Hyprland desktop (Super+A) and drives the agent CLI
+you already pay for, so it works on your Claude plan instead of per-token API
+billing. It gets safe, toggleable access to your desktop: calendar, to-dos and
+notes, notifications, Obsidian vault, media and system info. Codex and OpenCode
+support is planned.
 
 > Status: **early but usable**. The panel (Super+A), the daemon, the desktop MCP server,
 > the context generator and a terminal client work. See the roadmap.
