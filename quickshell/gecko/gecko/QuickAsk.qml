@@ -93,6 +93,7 @@ PanelWindow {
                 Keys.onPressed: event => {
                     const n = root.matches.length;
                     if (event.key === Qt.Key_Escape) { root.shown = false; event.accepted = true; }
+                    else if (Theme.zoomKey(event)) event.accepted = true;
                     else if (n && event.key === Qt.Key_Down) { root.index = (root.index + 1) % n; event.accepted = true; }
                     else if (n && event.key === Qt.Key_Up) { root.index = (root.index + n - 1) % n; event.accepted = true; }
                     else if (n && event.key === Qt.Key_Tab) { root.complete(root.matches[root.index]); event.accepted = true; }

@@ -47,11 +47,38 @@ Singleton {
     readonly property real bubbleRadius: t.bubble_radius ?? 20
     readonly property string font: t.font || Appearance.font.family.main
     readonly property string monoFont: t.mono_font || Appearance.font.family.monospace
-    readonly property real fontSize: t.font_size ?? 15
-    readonly property real width: t.width ?? 470
+    readonly property real fontSize: (t.font_size ?? 15) * zoom
+    // Wider panel when zoomed in, so lines don't wrap after a few words
+    readonly property real width: (t.width ?? 470) * Math.max(1, zoom)
+
+    // Text zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0), kept across restarts
+    readonly property real zoom: prefs.zoom
+    function setZoom(z) {
+        prefs.zoom = Math.round(Math.min(2, Math.max(0.7, z)) * 10) / 10;
+    }
+    function zoomKey(event) {
+        if (!(event.modifiers & Qt.ControlModifier)) return false;
+        if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) setZoom(zoom + 0.1);
+        else if (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore) setZoom(zoom - 0.1);
+        else if (event.key === Qt.Key_0) setZoom(1);
+        else return false;
+        return true;
+    }
     readonly property bool rightSide: t.side === "right"
     readonly property string assistantName: t.assistant_name ?? "Gecko"
     readonly property string avatar: t.avatar ?? "🦎"
+
+    FileView {
+        path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/geckos-helper/panel.json`
+        onAdapterUpdated: writeAdapter()
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound) writeAdapter();
+        }
+        JsonAdapter {
+            id: prefs
+            property real zoom: 1
+        }
+    }
 
     FileView {
         path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/geckos-helper/theme.json`

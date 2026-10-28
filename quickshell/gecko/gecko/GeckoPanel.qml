@@ -81,6 +81,8 @@ PanelWindow {
                 if (menu.shown) menu.shown = false;
                 else if (Gecko.page !== "chat") Gecko.page = "chat";
                 else Gecko.open = false;
+            } else if (Theme.zoomKey(event)) {
+                event.accepted = true;
             } else if (event.modifiers === Qt.ControlModifier) {
                 if (event.key === Qt.Key_O) panelWindow.extend = !panelWindow.extend;
                 else if (event.key === Qt.Key_N) Gecko.newChat();
