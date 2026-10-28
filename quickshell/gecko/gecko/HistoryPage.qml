@@ -117,6 +117,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
                     StyledText {
+                        font.pixelSize: Theme.fontSize
                         Layout.fillWidth: true
                         text: row.modelData.title
                         elide: Text.ElideRight
@@ -125,7 +126,7 @@ ColumnLayout {
                     StyledText {
                         text: `${new Date(row.modelData.updated * 1000).toLocaleString(Qt.locale(), "MMM d, h:mm ap")}`
                             + ` · ${row.modelData.model ?? ""}` + (row.modelData.busy ? " · working" : "")
-                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        font.pixelSize: Theme.fontSize * 0.75
                         color: Theme.textMuted
                     }
                 }
@@ -147,6 +148,7 @@ ColumnLayout {
     }
 
     StyledText {
+        font.pixelSize: Theme.fontSize
         Layout.alignment: Qt.AlignHCenter
         visible: Gecko.chats.length === 0
         text: "No chats yet"

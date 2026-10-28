@@ -17,7 +17,7 @@ StyledFlickable {
 
         StyledText {
             text: "What Gecko can access"
-            font.pixelSize: Appearance.font.pixelSize.large
+            font.pixelSize: Theme.fontSize * 1.15
             color: Theme.text
             Layout.leftMargin: 4
         }
@@ -26,7 +26,7 @@ StyledFlickable {
             Layout.leftMargin: 4
             text: "Checked on every tool call, so changes apply mid-chat."
             wrapMode: Text.Wrap
-            font.pixelSize: Appearance.font.pixelSize.smaller
+            font.pixelSize: Theme.fontSize * 0.85
             color: Theme.textMuted
         }
 
@@ -43,6 +43,7 @@ StyledFlickable {
                     Layout.fillWidth: true
                     spacing: 0
                     StyledText {
+                        font.pixelSize: Theme.fontSize
                         text: capRow.modelData.replace(/_/g, " ").replace(/^./, c => c.toUpperCase())
                         color: Theme.text
                     }
@@ -50,7 +51,7 @@ StyledFlickable {
                         Layout.fillWidth: true
                         text: Gecko.capabilityDescriptions[capRow.modelData]
                         wrapMode: Text.Wrap
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.pixelSize: Theme.fontSize * 0.85
                         color: Theme.textMuted
                     }
                 }
@@ -129,7 +130,7 @@ StyledFlickable {
             }
             StyledText {
                 text: `Default model: ${Gecko.defaultModel}`
-                font.pixelSize: Appearance.font.pixelSize.smaller
+                font.pixelSize: Theme.fontSize * 0.85
                 color: Theme.textMuted
             }
         }
