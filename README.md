@@ -64,7 +64,7 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **Hand-off**: copy a chat, or a short model-written brief, to paste into Claude.ai
   (panel menu, `gecko handoff [--brief]`, or just ask Gecko to hand it off)
 - Chat history, capability switches, kill switch, 5-hour / 7-day usage bars
-- Ctrl+N new chat, Ctrl+H history, Ctrl+T next theme, Ctrl+O wider panel, Esc closes
+- Ctrl+N new chat, Ctrl+H history, Ctrl+T next theme, Ctrl+O wider panel, Ctrl+Plus/Minus text size (Ctrl+0 resets), Esc closes
 - `qs -c gecko ipc call gecko ask "..."` sends a prompt from a script or keybind
 
 ## How it fits together
