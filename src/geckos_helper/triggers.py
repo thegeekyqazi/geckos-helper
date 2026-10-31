@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta
 
 from . import paths, recipes
-from .config import expand
+from .config import expand, load_state
 from .desktop import calendar, system
 
 log = logging.getLogger("gecko.triggers")
@@ -26,9 +26,9 @@ IGNORED_SUFFIXES = (".part", ".crdownload", ".tmp", ".download")
 
 class Triggers:
     def __init__(self) -> None:
-        self.battery_low = False
+        self.battery_low: dict[int, bool] = {}
         self.seen_files: dict[str, set[str]] = {}
-        self.fired_events: set[str] = set()
+        self.fired_events: dict[int, set[str]] = {}
         self.last_notification = time.time() * 1000  # only notifications after startup
         self.last_calendar_check = 0.0
         self.upcoming: list[dict] = []
@@ -36,13 +36,19 @@ class Triggers:
 
     def poll(self) -> list[tuple[dict, str]]:
         """(recipe, why) pairs to run now."""
+        if load_state()["killed"]:
+            return []
         active = [(r, t) for r in recipes.load() if r.get("enabled") for t in r.get("triggers", [])]
         if not active:
             return []
         fired = []
+        results: dict[str, str | None] = {}
         for r, t in active:
             try:
-                if why := getattr(self, f"_{t['type']}")(t.get("value")):
+                key = json.dumps(t, sort_keys=True)
+                if key not in results:
+                    results[key] = getattr(self, f"_{t['type']}")(t.get("value"))
+                if why := results[key]:
                     fired.append((r, why))
             except AttributeError:
                 log.warning("recipe %s: unknown trigger %s", r["id"], t.get("type"))
@@ -60,10 +66,11 @@ class Triggers:
         bat = system.battery()
         if not bat:
             return None
-        low = bat["status"] == "Discharging" and bat["percent"] < int(value or 15)
-        fire = low and not self.battery_low
-        if low or bat["status"] != "Discharging" or bat["percent"] > int(value or 15) + 5:
-            self.battery_low = low
+        threshold = int(value or 15)
+        low = bat["status"] == "Discharging" and bat["percent"] < threshold
+        fire = low and not self.battery_low.get(threshold, False)
+        if low or bat["status"] != "Discharging" or bat["percent"] > threshold + 5:
+            self.battery_low[threshold] = low
         return f"Battery is at {bat['percent']}% and discharging." if fire else None
 
     def _file_added(self, value) -> str | None:
@@ -81,14 +88,16 @@ class Triggers:
             self.last_calendar_check = time.time()
             self.upcoming = [e for e in calendar.events(days=2) if not e.get("all_day")]
         now = datetime.now().astimezone()
+        seen = self.fired_events.setdefault(minutes, set())
+        notices = []
         for e in self.upcoming:
             start = datetime.fromisoformat(e["start"]).astimezone()
             key = f"{e['calendar']}:{e['id']}:{e['start']}"
-            if now < start <= now + timedelta(minutes=minutes) and key not in self.fired_events:
-                self.fired_events.add(key)
+            if now < start <= now + timedelta(minutes=minutes) and key not in seen:
+                seen.add(key)
                 where = f" at {e['location']}" if e.get("location") else ""
-                return f"Event starting {start:%H:%M}: {e['title']}{where} ({e['calendar']} calendar)."
-        return None
+                notices.append(f"Event starting {start:%H:%M}: {e['title']}{where} ({e['calendar']} calendar).")
+        return " | ".join(notices) or None
 
     def _notification_from(self, value) -> str | None:
         try:
