@@ -49,10 +49,15 @@ Themes run in a sandbox: no `io`, `os`, `require` or file access.
 | `composer_bg` | the message box |
 | `radius`, `card_radius`, `bubble_radius` | corner rounding in pixels |
 | `font`, `mono_font`, `font_size` | `""` font means end-4's font |
-| `width`, `side` | panel width in pixels, `"left"` or `"right"` |
+| `width`, `side` | default panel width in pixels, `"left"` or `"right"` |
 | `popup` | menus and the / palette (keep it nearly opaque in see-through themes) |
 | `sheen` | a light gradient over the panel (glass); `"transparent"` for none |
 | `border_width`, `shadow` | edge width in pixels; `false` turns off the drop shadow |
+
+Settings → Display saves text scale and panel width separately in
+`~/.local/state/geckos-helper/panel.json`. Text scale multiplies `font_size`; it never
+changes width. A saved width overrides the theme's default; “Reset width” follows
+the current theme again. The full-height panel caps its width to the screen.
 | `assistant_name`, `avatar` | name and emoji shown on replies (and on the mascot) |
 | `mascot`, `mascot_corner`, `mascot_size` | desktop mascot: `"always"`, `"busy"` or `"off"`; corner like `"bottom-right"`; size in pixels |
 

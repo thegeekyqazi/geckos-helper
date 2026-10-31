@@ -61,10 +61,17 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **Activity** page: everything Gecko did, who approved it, watchers and recipes
 - **Memory** page: what Gecko remembers (Claude Code's own memory), plus search across all chats
 - **Mascot** in a screen corner: idle, working, or a badge when an approval is waiting (click it)
-- **Hand-off**: copy a chat, or a short model-written brief, to paste into Claude.ai
-  (panel menu, `gecko handoff [--brief]`, or just ask Gecko to hand it off)
+- **Continue in another AI chat**: preview and edit a model-written brief for Claude.ai,
+  ChatGPT or another chat before copying. Includes stored tool evidence, missing-file
+  notices and recipient access limits; files/images must be uploaded separately.
+  “Copy chat” exports the stored transcript. CLI: `gecko handoff [--brief] [--preview]`.
 - Chat history, capability switches, kill switch, 5-hour / 7-day usage bars
 - Ctrl+N new chat, Ctrl+H history, Ctrl+T next theme, Ctrl+O wider panel, Ctrl+Plus/Minus text size (Ctrl+0 resets), Esc closes
+- **Settings → Display** has separate saved panel width and text size (70–200%) controls
+  and resets. Drag the inner edge to resize width; the full-height panel stays within
+  the screen. Existing zoom settings keep their previous apparent width on upgrade.
+- Scroll up to read without incoming replies pulling you down; “Jump to latest” resumes.
+  Approval cards offer full selectable details and wrap their action buttons at large sizes.
 - `qs -c gecko ipc call gecko ask "..."` sends a prompt from a script or keybind
 
 ## How it fits together

@@ -92,4 +92,12 @@ Run `python -m unittest discover -s tests -v` in the project's Python environmen
 The suite uses temporary files and mocked desktop/agent integrations; process-lifecycle
 checks launch only local Python fixtures, never Claude or external services. It covers
 vault boundaries, kill/capability checks, background budgets/cancellation, recipe parsing,
-schedules, trigger fanout, injection scanning and approval scope/lifecycle.
+schedules, trigger fanout, injection scanning, approval scope/lifecycle and online handoff
+evidence/limits/preview behavior. Handoff tests mock the model and clipboard.
+
+`node tests/ui_state.mjs` checks the actual QML request and sizing functions with synthetic
+state: preview/error/offline handling, edited copy, separate width/zoom and size bounds.
+It does not render Qt or operate the desktop. For visual QA, use an isolated Quickshell
+config with synthetic chat state and a private XDG_STATE_HOME; never test against personal
+chats, notes or calendars. The panel source is symlinked live, so stage QML edits in a
+worktree and check its logs/CPU after activation. Do not reload the main end-4 shell.
