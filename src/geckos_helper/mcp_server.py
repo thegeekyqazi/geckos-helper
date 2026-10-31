@@ -14,8 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import activity, handoff_export, paths, recipes, watchers
-from .config import load_state
+from . import access, activity, handoff_export, paths, recipes, watchers
 from .desktop import calendar, notes, obsidian, projects, system, todo, untrusted
 from .desktop import weather as weather_mod
 from .handoff import open_claude_code
@@ -51,11 +50,10 @@ def gated(capability: str, *, writes: bool = False):
     def wrap(fn):
         @functools.wraps(fn)
         def inner(*args, **kwargs) -> Any:
-            state = load_state()
-            if state["killed"]:
-                raise Disabled("Gecko's Helper kill switch is on; desktop access is disabled.")
-            if not state["capabilities"].get(capability):
-                raise Disabled(f"The user has turned off the '{capability}' capability.")
+            try:
+                access.require(capability)
+            except PermissionError as e:
+                raise Disabled(str(e)) from e
             if writes and READONLY:
                 raise Disabled("This is a read-only (unattended) session; it cannot change anything.")
             if writes:

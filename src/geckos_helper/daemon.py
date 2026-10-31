@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Any
 
-from . import (activity, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+from . import (access, activity, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, notes, obsidian, projects, todo
@@ -76,6 +76,9 @@ class Daemon:
         self.watcher_lock = asyncio.Lock()
         self.budget_logged = 0.0
         self.triggers = triggers.Triggers()
+
+    async def desktop_call(self, capability, fn, *args):
+        return await asyncio.to_thread(access.call, capability, fn, *args)
 
     # --- events ----------------------------------------------------------
 
@@ -194,7 +197,12 @@ class Daemon:
 
     async def op_permission(self, req: dict) -> dict:
         """allow: bool; scope: "once" (default), "chat" (this chat) or "always" (saved rule)."""
-        chat_id = self.pending.pop(req["request_id"])
+        if req["allow"]:
+            access.require()
+        chat_id = self.pending.get(req["request_id"])
+        if chat_id is None or chat_id not in self.backends:
+            raise ValueError("This approval has expired; the agent is no longer waiting")
+        self.pending.pop(req["request_id"])
         backend = self.backends[chat_id]
         info = self.request_info.pop(req["request_id"], {})
         tool, inp = info.get("tool", ""), info.get("input", {})
@@ -292,11 +300,12 @@ class Daemon:
 
     async def op_export(self, req: dict) -> dict:
         """Copy a chat to the clipboard to continue elsewhere. mode: transcript | brief."""
+        access.require("clipboard_write")
         if req.get("mode") == "brief":
             text = await handoff_export.brief(self.store, req["chat"])
         else:
             text = handoff_export.transcript(self.store, req["chat"])
-        await asyncio.to_thread(handoff_export.to_clipboard, text)
+        await self.desktop_call("clipboard_write", handoff_export.to_clipboard, text)
         return {"chars": len(text)}
 
     async def op_search(self, req: dict) -> dict:
@@ -315,6 +324,7 @@ class Daemon:
         elif req.get("pause") or req.get("resume"):
             watchers.update(req.get("pause") or req["resume"], paused=bool(req.get("pause")))
         elif req.get("run"):
+            access.require("watchers")
             w = next(w for w in watchers.load() if w["id"] == req["run"])
             asyncio.create_task(self.run_watcher(w))
         return {"watchers": [watchers.describe(w) for w in watchers.load()]}
@@ -322,21 +332,22 @@ class Daemon:
     async def op_calendar(self, req: dict) -> dict:
         """Events for the panel's calendar view: days from start (YYYY-MM-DD, default today)."""
         start = date.fromisoformat(req["start"]) if req.get("start") else None
-        evs = await asyncio.to_thread(calendar.events, req.get("days", 7), start)
+        evs = await self.desktop_call("calendar_read", calendar.events, req.get("days", 7), start)
         return {"events": evs, "errors": list(calendar.last_errors), "configured": calendar.configured()}
 
     async def op_projects(self, req: dict) -> dict:
         """Projects, goals and ideas for the panel."""
         try:
-            return {"projects": await asyncio.to_thread(projects.list_projects),
-                    "ideas": await asyncio.to_thread(projects.ideas), "vault": str(obsidian.vault())}
+            return {"projects": await self.desktop_call("projects", projects.list_projects),
+                    "ideas": await self.desktop_call("projects", projects.ideas), "vault": str(obsidian.vault())}
         except FileNotFoundError:  # no vault configured
             return {"projects": [], "ideas": [], "vault": ""}
 
     async def op_capture(self, req: dict) -> dict:
         """Capture an attachment: screenshot | window | clipboard | selection | file.
         Returns {"attachment": null} if the user cancelled or there was nothing."""
-        return {"attachment": await asyncio.to_thread(attachments.capture, req["kind"])}
+        capability = "clipboard_read" if req["kind"] in ("clipboard", "selection") else None
+        return {"attachment": await self.desktop_call(capability, attachments.capture, req["kind"])}
 
     async def op_quick(self, req: dict) -> dict:
         """Slash-command actions that need no agent: todo, note, idea."""
@@ -345,13 +356,13 @@ class Daemon:
             raise ValueError("Nothing to add")
         action = req["action"]
         if action == "todo":
-            result = await asyncio.to_thread(todo.add, text)
+            result = await self.desktop_call("todo_write", todo.add, text)
         elif action == "note":
             if not notes.available():
                 raise ValueError("Desktop notes need the desktop widgets from Gecko's dots")
-            result = await asyncio.to_thread(notes.add, text)
+            result = await self.desktop_call("notes", notes.add, text)
         elif action == "idea":
-            result = {"path": await asyncio.to_thread(obsidian.capture_idea, text)}
+            result = {"path": await self.desktop_call("obsidian_write", obsidian.capture_idea, text)}
         else:
             raise ValueError(f"Unknown quick action {action!r}")
         activity.log("action", tool=f"/{action}", args={"text": text})
@@ -361,10 +372,13 @@ class Daemon:
         """No args: list. read=<id> marks read, unread=<id>, remove=<id>,
         add_todos=<id> with todos=[...]: add the chosen suggestions to the to-do list."""
         if req.get("add_todos"):
+            access.require("todo_write")
             item = next(i for i in self.store.inbox(500) if i["id"] == req["add_todos"])
-            chosen = [t for t in req.get("todos", []) if t in item["todos"]]  # only what was suggested
+            if item.get("flagged"):
+                raise PermissionError("Suggested to-dos from flagged reports cannot be added")
+            chosen = list(dict.fromkeys(t for t in req.get("todos", []) if t in item["todos"]))  # only what was suggested
             for t in chosen:
-                await asyncio.to_thread(todo.add, t)
+                await self.desktop_call("todo_write", todo.add, t)
             self.store.inbox_set_todos(item["id"], [t for t in item["todos"] if t not in chosen])
             activity.log("action", tool="inbox: add to-dos", args={"text": "; ".join(chosen)})
         elif req.get("read"):
@@ -384,8 +398,11 @@ class Daemon:
     async def op_recipes(self, req: dict) -> dict:
         """No args: list. enable=<id>/disable=<id>, run=<id> (run now, in the background)."""
         if req.get("enable") or req.get("disable"):
+            if req.get("enable"):
+                access.require("recipes")
             recipes.set_enabled(req.get("enable") or req["disable"], bool(req.get("enable")))
         elif req.get("run"):
+            access.require("recipes")
             asyncio.create_task(self.run_recipe(recipes.get(req["run"])))
         return {"recipes": [recipes.describe(r) for r in recipes.load()]}
 
@@ -503,7 +520,9 @@ class Daemon:
         """Keep the shared calendar.json fresh for desktop widgets."""
         while True:
             try:
-                await asyncio.to_thread(calendar_feed.write)
+                await self.desktop_call("calendar_read", calendar_feed.write)
+            except PermissionError:
+                pass  # kill switch / disabled calendar: leave the last feed untouched
             except Exception:
                 log.exception("calendar feed")
             await asyncio.sleep(600)
