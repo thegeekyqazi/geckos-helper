@@ -48,13 +48,31 @@ Singleton {
     readonly property string font: t.font || Appearance.font.family.main
     readonly property string monoFont: t.mono_font || Appearance.font.family.monospace
     readonly property real fontSize: (t.font_size ?? 15) * zoom
-    // Wider panel when zoomed in, so lines don't wrap after a few words
-    readonly property real width: (t.width ?? 470) * Math.max(1, zoom)
+    readonly property real defaultWidth: t.width ?? 470
+    readonly property real width: prefs.panelWidth > 0 ? prefs.panelWidth : defaultWidth
+    // Actual display limits are supplied by the panel, including gaps/shadows.
+    property real availableWidth: 1600
+    readonly property real maxWidth: Math.max(1, Math.min(1600, availableWidth))
+    readonly property real minWidth: Math.min(360, maxWidth)
+    readonly property real panelWidth: Math.round(Math.min(maxWidth, Math.max(minWidth, width)))
+    property bool prefsReady: false
+    property bool themeReady: false
+    function migrateSizing() {
+        if (!prefsReady || !themeReady || prefs.sizingVersion >= 1) return;
+        // Preserve the previous apparent width once, then keep it independent of text.
+        if (prefs.panelWidth <= 0) prefs.panelWidth = Math.round(defaultWidth * Math.max(1, zoom));
+        prefs.sizingVersion = 1;
+    }
+    function setWidth(w) {
+        if (Number.isFinite(w)) prefs.panelWidth = Math.round(Math.min(maxWidth, Math.max(minWidth, w)));
+    }
+    function resetWidth() { prefs.panelWidth = 0; }
+    function toggleWidth() { setWidth(panelWidth < defaultWidth * 1.25 ? defaultWidth * 1.5 : defaultWidth); }
 
     // Text zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0), kept across restarts
-    readonly property real zoom: prefs.zoom
+    readonly property real zoom: Number.isFinite(prefs.zoom) ? Math.min(2, Math.max(0.7, prefs.zoom)) : 1
     function setZoom(z) {
-        prefs.zoom = Math.round(Math.min(2, Math.max(0.7, z)) * 10) / 10;
+        if (Number.isFinite(z)) prefs.zoom = Math.round(Math.min(2, Math.max(0.7, z)) * 10) / 10;
     }
     function zoomKey(event) {
         if (!(event.modifiers & Qt.ControlModifier)) return false;
@@ -68,15 +86,29 @@ Singleton {
     readonly property string assistantName: t.assistant_name ?? "Gecko"
     readonly property string avatar: t.avatar ?? "🦎"
 
+    Timer {
+        id: savePrefs
+        interval: 150
+        onTriggered: prefsFile.writeAdapter()
+    }
     FileView {
+        id: prefsFile
         path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/geckos-helper/panel.json`
-        onAdapterUpdated: writeAdapter()
+        atomicWrites: false
+        onAdapterUpdated: if (root.prefsReady) savePrefs.restart()
+        onLoaded: { root.prefsReady = true; Qt.callLater(root.migrateSizing); }
         onLoadFailed: error => {
-            if (error === FileViewError.FileNotFound) writeAdapter();
+            if (error === FileViewError.FileNotFound) {
+                root.prefsReady = true;
+                Qt.callLater(root.migrateSizing);
+                savePrefs.restart();
+            }
         }
         JsonAdapter {
             id: prefs
             property real zoom: 1
+            property real panelWidth: 0
+            property int sizingVersion: 0
         }
     }
 
@@ -84,6 +116,7 @@ Singleton {
         path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/geckos-helper/theme.json`
         watchChanges: true
         onFileChanged: reload()
+        onLoadFailed: error => { root.themeReady = true; Qt.callLater(root.migrateSizing); }
         onLoaded: {
             try {
                 const out = JSON.parse(text());
@@ -94,6 +127,8 @@ Singleton {
             } catch (e) {
                 console.warn("[Gecko] bad theme.json:", e);
             }
+            root.themeReady = true;
+            Qt.callLater(root.migrateSizing);
         }
     }
 }

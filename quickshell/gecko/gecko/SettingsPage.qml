@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import qs.modules.common
 import qs.modules.common.widgets
@@ -15,8 +16,50 @@ StyledFlickable {
         width: root.width - 28
         spacing: 6
 
+        GText { text: "Display"; rel: 1.15; font.weight: Font.DemiBold }
+        GText {
+            Layout.fillWidth: true
+            text: "Panel width and text size are saved independently. Drag the panel's inner edge to resize. Height follows the screen."
+            muted: true
+            rel: 0.85
+        }
+        GText { text: `Text size · ${Math.round(Theme.zoom * 100)}%`; font.weight: Font.DemiBold }
+        Slider {
+            Layout.fillWidth: true
+            from: 0.7; to: 2; stepSize: 0.1
+            value: Theme.zoom
+            onMoved: Theme.setZoom(value)
+            Accessible.name: "Text size"
+        }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+            TextButton { label: "Smaller"; enabled: Theme.zoom > 0.7; onClicked: Theme.setZoom(Theme.zoom - 0.1) }
+            TextButton { label: "Larger"; enabled: Theme.zoom < 2; onClicked: Theme.setZoom(Theme.zoom + 0.1) }
+            TextButton { label: "Reset text"; onClicked: Theme.setZoom(1) }
+        }
+        GText { text: `Panel width · ${Theme.panelWidth} px`; font.weight: Font.DemiBold }
+        Slider {
+            Layout.fillWidth: true
+            from: Theme.minWidth; to: Math.max(Theme.minWidth + 1, Theme.maxWidth); stepSize: 10
+            value: Theme.panelWidth
+            onMoved: Theme.setWidth(value)
+            Accessible.name: "Panel width"
+        }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+            TextButton { label: "Narrower"; enabled: Theme.panelWidth > Theme.minWidth; onClicked: Theme.setWidth(Theme.panelWidth - 40) }
+            TextButton { label: "Wider"; enabled: Theme.panelWidth < Theme.maxWidth; onClicked: Theme.setWidth(Theme.panelWidth + 40) }
+            TextButton { label: "Reset width"; onClicked: Theme.resetWidth() }
+        }
+        GText { Layout.fillWidth: true; text: "Ctrl + / −: text size · Ctrl+0: reset text · Ctrl+O: toggle width"; muted: true; rel: 0.75 }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: 8; Layout.bottomMargin: 8 }
+
         StyledText {
+            Layout.fillWidth: true
             text: "What Gecko can access"
+            wrapMode: Text.Wrap
             font.pixelSize: Theme.fontSize * 1.15
             color: Theme.text
             Layout.leftMargin: 4
@@ -43,6 +86,8 @@ StyledFlickable {
                     Layout.fillWidth: true
                     spacing: 0
                     StyledText {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
                         font.pixelSize: Theme.fontSize
                         text: capRow.modelData.replace(/_/g, " ").replace(/^./, c => c.toUpperCase())
                         color: Theme.text
@@ -117,15 +162,17 @@ StyledFlickable {
 
         Item { implicitHeight: 8 }
 
-        RowLayout {
+        ColumnLayout {
+            Layout.fillWidth: true
             Layout.leftMargin: 4
             spacing: 8
-            DialogButton {
+            TextButton {
                 id: ctxButton
-                buttonText: "Refresh tools context"
+                label: "Refresh tools context"
+                Layout.maximumWidth: column.width
                 onClicked: {
-                    buttonText = "Refreshing…";
-                    Gecko.regenerateContext(() => ctxButton.buttonText = "Refreshed");
+                    label = "Refreshing…";
+                    Gecko.regenerateContext(() => ctxButton.label = "Refreshed");
                 }
             }
             StyledText {

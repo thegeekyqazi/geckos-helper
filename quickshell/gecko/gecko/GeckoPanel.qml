@@ -10,12 +10,17 @@ PanelWindow {
     id: panelWindow
     visible: Gecko.open
 
-    property bool extend: false
-    property real panelWidth: extend ? Theme.width * 1.5 : Theme.width
+    readonly property real panelWidth: resizeGrip.pressed ? resizeGrip.draggedWidth : Theme.panelWidth
+    readonly property real outerMargin: Math.max(Appearance.sizes.elevationMargin, Appearance.sizes.hyprlandGapsOut)
+    Binding {
+        target: Theme
+        property: "availableWidth"
+        value: Math.max(1, (panelWindow.screen?.width ?? 1920) - panelWindow.outerMargin * 2)
+    }
 
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: 0
-    implicitWidth: Theme.width * 1.5 + Appearance.sizes.elevationMargin * 2
+    implicitWidth: panelWidth + outerMargin * 2
     WlrLayershell.namespace: "quickshell:gecko"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
     color: "transparent"
@@ -72,10 +77,6 @@ PanelWindow {
             }
         }
 
-        Behavior on width {
-            animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
-        }
-
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
                 if (menu.shown) menu.shown = false;
@@ -84,7 +85,7 @@ PanelWindow {
             } else if (Theme.zoomKey(event)) {
                 event.accepted = true;
             } else if (event.modifiers === Qt.ControlModifier) {
-                if (event.key === Qt.Key_O) panelWindow.extend = !panelWindow.extend;
+                if (event.key === Qt.Key_O) Theme.toggleWidth();
                 else if (event.key === Qt.Key_N) Gecko.newChat();
                 else if (event.key === Qt.Key_H) Gecko.page = Gecko.page === "history" ? "chat" : "history";
                 else if (event.key === Qt.Key_T) Gecko.cycleTheme(1);
@@ -98,6 +99,7 @@ PanelWindow {
             spacing: 0
 
             Header {
+                id: panelHeader
                 onMenuRequested: menu.shown = !menu.shown
                 Layout.fillWidth: true
                 Layout.margins: 8
@@ -165,8 +167,43 @@ PanelWindow {
             id: menu
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: 50
+            anchors.topMargin: panelHeader.height + 12
             anchors.rightMargin: 10
+        }
+
+        MouseArea { // Drag the inner edge; save on release rather than on every pixel.
+            id: resizeGrip
+            z: 40
+            width: 10
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: Theme.rightSide ? parent.left : undefined
+            anchors.right: Theme.rightSide ? undefined : parent.right
+            hoverEnabled: true
+            cursorShape: Qt.SizeHorCursor
+            property real startWidth: 0
+            property real startX: 0
+            property real draggedWidth: Theme.panelWidth
+            onPressed: mouse => {
+                startWidth = Theme.panelWidth;
+                startX = mapToGlobal(mouse.x, mouse.y).x;
+                draggedWidth = startWidth;
+            }
+            onPositionChanged: mouse => {
+                if (!pressed) return;
+                const delta = mapToGlobal(mouse.x, mouse.y).x - startX;
+                draggedWidth = Math.min(Theme.maxWidth, Math.max(Theme.minWidth,
+                    startWidth + delta * (Theme.rightSide ? -1 : 1)));
+            }
+            onReleased: Theme.setWidth(draggedWidth)
+            Rectangle {
+                anchors.centerIn: parent
+                width: 3
+                height: 44
+                radius: 2
+                color: parent.pressed || parent.containsMouse ? Theme.accent : Theme.border
+            }
+            StyledToolTip { text: "Drag to resize panel width" }
         }
     }
 
@@ -177,7 +214,7 @@ PanelWindow {
 
         RippleButton { // Chat title; opens history
             Layout.fillWidth: true
-            implicitHeight: 38
+            implicitHeight: Math.max(38, Theme.fontSize * 1.4 + 14)
             buttonRadius: Theme.cardRadius
             colBackground: "transparent"
             colBackgroundHover: Theme.surfaceHigh
