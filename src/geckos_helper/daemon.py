@@ -322,12 +322,23 @@ class Daemon:
         return {"name": out["name"], "themes": out["themes"], "error": out["error"]}
 
     async def op_export(self, req: dict) -> dict:
-        """Copy a chat to the clipboard to continue elsewhere. mode: transcript | brief."""
+        """Prepare a preview, or copy an export. mode: transcript | brief."""
         access.require("clipboard_write")
         if req.get("mode") == "brief":
-            text = await handoff_export.brief(self.store, req["chat"])
+            result = await handoff_export.prepare(self.store, req["chat"])
         else:
-            text = handoff_export.transcript(self.store, req["chat"])
+            result = {"text": handoff_export.transcript(self.store, req["chat"]), "warnings": []}
+        text = result["text"]
+        if req.get("preview"):
+            return {**result, "chars": len(text)}
+        await self.desktop_call("clipboard_write", handoff_export.to_clipboard, text)
+        return {"chars": len(text), "warnings": result["warnings"]}
+
+    async def op_copy_handoff(self, req: dict) -> dict:
+        """Copy the user's reviewed/edited handoff, checking access again at copy time."""
+        text = req["text"]
+        if not isinstance(text, str) or not text.strip() or len(text) > 1_000_000:
+            raise ValueError("Handoff must contain 1–1,000,000 characters")
         await self.desktop_call("clipboard_write", handoff_export.to_clipboard, text)
         return {"chars": len(text)}
 

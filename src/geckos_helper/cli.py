@@ -134,6 +134,7 @@ def main() -> None:
     hx = sub.add_parser("handoff", help="copy a chat to the clipboard to continue elsewhere")
     hx.add_argument("chat", nargs="?", help="chat id (default: most recent)")
     hx.add_argument("--brief", action="store_true", help="have a small model write a hand-off brief")
+    hx.add_argument("--preview", action="store_true", help="print the export for review without copying")
     cal = sub.add_parser("calendar", help="calendars: login (Google), list, or show the next days")
     cal.add_argument("action", choices=["login", "list", "show"], nargs="?", default="show")
     cal.add_argument("--days", type=int, default=3)
@@ -182,9 +183,16 @@ def main() -> None:
                 async def handoff():
                     client = Client()
                     await client.connect()
-                    chat = args.chat or (await client.call("chats", limit=1))["chats"][0]["id"]
-                    r = await client.call("export", chat=chat, mode="brief" if args.brief else "transcript")
-                    print(f"copied {r['chars']} characters; paste into Claude.ai or anywhere")
+                    chats = (await client.call("chats", limit=1))["chats"] if not args.chat else []
+                    if not args.chat and not chats:
+                        raise ValueError("No chats to export")
+                    chat = args.chat or chats[0]["id"]
+                    r = await client.call("export", chat=chat, mode="brief" if args.brief else "transcript",
+                                          preview=args.preview)
+                    if args.preview:
+                        print(r["text"], end="")
+                    else:
+                        print(f"copied {r['chars']} characters; review before sharing in another AI chat")
                 asyncio.run(handoff())
             case "calendar":
                 from .desktop import calendar, calendar_google

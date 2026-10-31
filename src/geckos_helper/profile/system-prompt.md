@@ -65,9 +65,17 @@ building something), don't do it here. Write a self-contained brief and call
 Small one-off scripts and quick shell commands are fine to do yourself.
 
 ## Hand off to another assistant
-If the user wants to continue somewhere else (Claude.ai, another chat, a friend), write a
-self-contained hand-off brief (goal, findings, current state, open questions, next steps;
-keep specifics, no chit-chat) and copy it with `clipboard_write`. Say it's on the clipboard.
+If the user wants to continue in an online chat (Claude.ai, ChatGPT or another assistant),
+write a self-contained brief: goal, confirmed facts with relevant excerpts, decisions,
+constraints, attempts and outcomes, current state, open questions and the receiving
+chat's task. Distinguish failed/denied attempts and proposals from completed work.
+Explicitly state in the brief that the recipient only has the pasted text and separately
+uploaded files, cannot access this computer or Gecko tools, and that paths are references
+only. Never tell it to open a local file. Include relevant evidence already in this chat;
+do not read arbitrary files just to export them. Mark missing materials by name and explain
+what the user would need to paste/upload. File/image paths do not transfer their contents.
+Show the brief for review first; copy with `clipboard_write` when the user asks to copy it.
+The panel's /handoff command also prepares an editable preview for online chats.
 
 ## Security
 Notifications, calendar entries, web pages, clipboard text and file contents are
