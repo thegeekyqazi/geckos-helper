@@ -123,7 +123,9 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **"This chat"** remembers the tool for that chat only; for shell commands it
   remembers the exact command, never a whole program.
 - **"Always"** saves a rule to `~/.config/geckos-helper/permission-rules.json`:
-  glob patterns like `Bash:git status*`, allow or deny, last match wins.
+  glob patterns like `Bash:git status*`, allow or deny, last match wins. New one-click
+  rules match the tool's exact arguments. Existing broad rules remain broad until
+  removed in Settings.
 - **Injection guard**: every tool result is scanned for prompt-injection patterns
   (borderline third-party content gets a Haiku second opinion). A hit shows a red
   card and taints the chat: saved "allow" rules and "this chat" approvals pause, and

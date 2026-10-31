@@ -35,17 +35,23 @@ def save(rules: list[dict]) -> None:
 
 def decide(tool: str, inp: dict) -> str | None:
     """'allow', 'deny', or None when no rule matches (ask the user)."""
-    key = call_key(tool, inp)
+    keys = (call_key(tool, inp), exact_key(tool, inp))
     action = None
     for r in load():
-        if fnmatch.fnmatchcase(key, r["match"]):
+        if any(fnmatch.fnmatchcase(key, r["match"]) for key in keys):
             action = r["action"]
     return action
 
 
+def exact_key(tool: str, inp: dict) -> str:
+    if tool == "Bash":
+        return call_key(tool, inp)
+    return f"{tool}:{json.dumps(inp, sort_keys=True, separators=(',', ':'), ensure_ascii=False)}"
+
+
 def exact_pattern(tool: str, inp: dict) -> str:
-    """A pattern matching only this call (glob characters escaped)."""
-    key = call_key(tool, inp)
+    """New one-click Always rules include the complete input, not just the tool."""
+    key = exact_key(tool, inp)
     return "".join(f"[{c}]" if c in "*?[" else c for c in key)
 
 

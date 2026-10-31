@@ -88,8 +88,8 @@ class Daemon:
         for w in list(self.clients):
             try:
                 w.write(line)
-                await w.drain()
-            except (ConnectionError, RuntimeError):
+                await asyncio.wait_for(w.drain(), 1)
+            except (ConnectionError, RuntimeError, TimeoutError):
                 self.clients.discard(w)
 
     def emitter(self, chat_id: str):
@@ -124,11 +124,21 @@ class Daemon:
                 self.usage = data
             elif kind == "closed":
                 self.backends.pop(chat_id, None)
+                await self.expire_permissions(chat_id)
+                self.turn_denials.pop(chat_id, None)
             self.store.append(chat_id, kind, data)
             self.last_active[chat_id] = time.time()
             await self.broadcast({"event": kind, "chat": chat_id, **data})
 
         return emit
+
+    async def expire_permissions(self, chat_id: str) -> None:
+        for rid, pending_chat in list(self.pending.items()):
+            if pending_chat == chat_id:
+                self.pending.pop(rid, None)
+                self.request_info.pop(rid, None)
+                await self.broadcast({"event": "permission_resolved", "chat": chat_id,
+                                      "request_id": rid, "allow": False, "expired": True})
 
     # --- operations ------------------------------------------------------
 
@@ -157,13 +167,17 @@ class Daemon:
         backend = self.backend_for(chat)
         await self.emitter(chat["id"])("user_message", {"text": req["text"],
                                                          "attachments": attachments.summary(atts)})
-        await backend.prompt(await asyncio.to_thread(attachments.to_content, req["text"], atts))
+        content = await asyncio.to_thread(attachments.to_content, req["text"], atts)
+        access.require()  # attachments may take time; do not restart an agent after kill
+        await backend.prompt(content)
         self.store.update(chat["id"])
         return {"chat": chat["id"]}
 
     def auto_decision(self, chat_id: str, data: dict) -> tuple[bool, str] | None:
         """(allow, decided_by) when a request needs no prompt; saved rules first."""
         tool, inp = data["tool"], data["input"]
+        if config.load_state()["killed"]:
+            return False, "kill_switch"
         if call_key(tool, inp) in self.turn_denials.get(chat_id, ()):
             return False, "repeat"
         decision = rules.decide(tool, inp)
@@ -224,6 +238,7 @@ class Daemon:
     async def op_stop(self, req: dict) -> dict:
         if b := self.backends.get(req["chat"]):
             await b.interrupt()
+        await self.expire_permissions(req["chat"])
         return {}
 
     async def op_chats(self, req: dict) -> dict:
@@ -263,6 +278,8 @@ class Daemon:
     async def op_delete(self, req: dict) -> dict:
         if b := self.backends.pop(req["chat"], None):
             await b.close()
+        await self.expire_permissions(req["chat"])
+        self.chat_allows.pop(req["chat"], None)
         self.store.delete(req["chat"])
         return {}
 
@@ -283,6 +300,9 @@ class Daemon:
             await agent_process.stop_all()
             await asyncio.gather(*(b.close() for b in list(self.backends.values())), return_exceptions=True)
             self.backends.clear()
+            for chat_id in set(self.pending.values()):
+                await self.expire_permissions(chat_id)
+            self.chat_allows.clear()
         context.generate_lite()
         return {"killed": on}
 
@@ -430,6 +450,7 @@ class Daemon:
         self.clients.add(writer)
         try:
             async for line in reader:
+                req = None
                 try:
                     req = json.loads(line)
                     handler = getattr(self, f"op_{req['op']}")
