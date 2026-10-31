@@ -10,8 +10,8 @@ Rectangle {
     property bool removable: true
     signal removed()
 
-    implicitHeight: 44
-    implicitWidth: Math.min(220, row.implicitWidth + 12)
+    implicitHeight: Math.max(44, Theme.fontSize + 18)
+    implicitWidth: Math.min(parent.width, Math.max(220, Theme.fontSize * 12), row.implicitWidth + 12)
     radius: Theme.cardRadius - 4
     color: Theme.surfaceHigh
     border.width: 1

@@ -12,7 +12,7 @@ Rectangle {
     property bool shown: false
     visible: shown
     z: 10
-    implicitWidth: 230
+    implicitWidth: Math.min(parent.width - 28, Math.max(230, Theme.fontSize * 15))
     implicitHeight: column.implicitHeight + 12
     radius: Theme.cardRadius
     color: Theme.popup
@@ -39,7 +39,7 @@ Rectangle {
                 required property string modelData
                 readonly property bool current: (Gecko.chatModel || Gecko.defaultModel) === modelData
                 Layout.fillWidth: true
-                implicitHeight: 38
+                implicitHeight: Math.max(38, Theme.fontSize * 1.4 + 16)
                 buttonRadius: Theme.cardRadius - 4
                 colBackground: "transparent"
                 colBackgroundHover: Theme.surface

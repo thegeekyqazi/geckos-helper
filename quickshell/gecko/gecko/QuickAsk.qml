@@ -20,8 +20,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:gecko-quickask"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    implicitWidth: 640
-    implicitHeight: box.implicitHeight + palette.implicitHeight + 40
+    implicitWidth: Math.min(800, Math.max(640, Theme.fontSize * 28), (screen?.width ?? 1920) - 24)
+    implicitHeight: Math.min((screen?.height ?? 1080) - 24, box.implicitHeight + palette.implicitHeight + 40)
 
     readonly property var matches: Gecko.matchCommands(field.text)
     property int index: 0
@@ -69,7 +69,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 10
         width: parent.width - 20
-        implicitHeight: 58
+        implicitHeight: Math.max(58, Theme.fontSize * 1.6 + 28)
         radius: Theme.radius
         color: Theme.bg
         border.width: 1
@@ -114,7 +114,7 @@ PanelWindow {
         anchors.topMargin: 6
         anchors.horizontalCenter: parent.horizontalCenter
         width: box.width
-        implicitHeight: visible ? Math.min(list.contentHeight + 12, 300) : 0
+        implicitHeight: visible ? Math.min(list.contentHeight + 12, 360, (root.screen?.height ?? 1080) - box.height - 64) : 0
         radius: Theme.cardRadius
         color: Theme.popup
         border.width: 1
@@ -132,16 +132,17 @@ PanelWindow {
                 required property var modelData
                 required property int index
                 width: list.width
-                implicitHeight: 34
+                implicitHeight: commandRow.implicitHeight + 16
                 radius: Theme.cardRadius - 6
                 color: index === root.index ? Theme.surface : "transparent"
-                RowLayout {
+                ColumnLayout {
+                    id: commandRow
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
-                    GText { text: `/${row.modelData.name}`; font.family: Theme.monoFont; color: Theme.accent; rel: 0.9; wrapMode: Text.NoWrap }
-                    GText { visible: row.modelData.arg.length > 0; text: row.modelData.arg; muted: true; rel: 0.8; wrapMode: Text.NoWrap }
-                    GText { Layout.fillWidth: true; horizontalAlignment: Text.AlignRight; text: row.modelData.desc; muted: true; rel: 0.8; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                    spacing: 2
+                    GText { Layout.fillWidth: true; text: `/${row.modelData.name} ${row.modelData.arg}`.trim(); font.family: Theme.monoFont; color: Theme.accent; rel: 0.9 }
+                    GText { Layout.fillWidth: true; text: row.modelData.desc; muted: true; rel: 0.8 }
                 }
                 MouseArea { anchors.fill: parent; onClicked: root.complete(row.modelData) }
             }

@@ -6,7 +6,7 @@ RippleButton {
     id: root
     property string label
     implicitHeight: labelText.implicitHeight + 18
-    implicitWidth: labelText.implicitWidth + 28
+    implicitWidth: Math.min(parent?.width ?? 1600, labelText.implicitWidth + 28)
     buttonRadius: Theme.cardRadius
     colBackground: Theme.surfaceHigh
     colBackgroundHover: Theme.surface

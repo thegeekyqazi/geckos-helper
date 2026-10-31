@@ -23,7 +23,7 @@ ColumnLayout {
         Layout.leftMargin: 10
         Layout.rightMargin: 10
         Layout.topMargin: 4
-        implicitHeight: 38
+        implicitHeight: Math.max(38, Theme.fontSize * 1.4 + 14)
         radius: Theme.cardRadius
         color: Theme.surface
         border.width: search.activeFocus ? 1 : 0
@@ -102,13 +102,14 @@ ColumnLayout {
             id: row
             required property var modelData
             width: list.width - 16
-            implicitHeight: 54
+            implicitHeight: historyRow.implicitHeight + 18
             buttonRadius: Theme.cardRadius
             toggled: modelData.id === Gecko.chatId
             colBackgroundToggled: Theme.surfaceHigh
             colBackgroundToggledHover: Theme.surface
             onClicked: Gecko.openChat(modelData.id)
             contentItem: RowLayout {
+                id: historyRow
                 anchors.fill: parent
                 anchors.leftMargin: 12
                 anchors.rightMargin: 4
@@ -117,13 +118,15 @@ ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
                     StyledText {
-                        font.pixelSize: Theme.fontSize
                         Layout.fillWidth: true
+                        font.pixelSize: Theme.fontSize
                         text: row.modelData.title
                         elide: Text.ElideRight
                         color: row.toggled ? Theme.text : Theme.text
                     }
                     StyledText {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
                         text: `${new Date(row.modelData.updated * 1000).toLocaleString(Qt.locale(), "MMM d, h:mm ap")}`
                             + ` · ${row.modelData.model ?? ""}` + (row.modelData.busy ? " · working" : "")
                         font.pixelSize: Theme.fontSize * 0.75

@@ -281,6 +281,7 @@ Item {
         id: permissionCard
         Rectangle {
             id: pcard
+            property bool detailsExpanded: false
             readonly property bool pending: root.permState === "pending"
             implicitHeight: pcCol.implicitHeight + 24
             radius: Theme.cardRadius
@@ -321,11 +322,12 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     visible: pcard.pending && root.inputJson !== "{}"
-                    implicitHeight: inputText.implicitHeight + 14
+                    implicitHeight: (pcard.detailsExpanded ? fullInput.implicitHeight : inputText.implicitHeight) + 14
                     radius: 8
                     color: Qt.alpha(Theme.bg, 0.5)
                     GText {
                         id: inputText
+                        visible: !pcard.detailsExpanded
                         anchors.fill: parent
                         anchors.margins: 7
                         text: root.inputJson
@@ -335,8 +337,29 @@ Item {
                         rel: 0.75
                         color: Theme.permissionText
                     }
+                    TextEdit {
+                        id: fullInput
+                        visible: pcard.detailsExpanded
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        text: root.inputJson
+                        textFormat: TextEdit.PlainText
+                        wrapMode: TextEdit.Wrap
+                        readOnly: true
+                        selectByMouse: true
+                        font.family: Theme.monoFont
+                        font.pixelSize: Theme.fontSize * 0.75
+                        color: Theme.permissionText
+                    }
                 }
-                RowLayout {
+                TextButton {
+                    visible: pcard.pending && root.inputJson !== "{}"
+                    label: pcard.detailsExpanded ? "Collapse details" : "Show full details"
+                    Layout.maximumWidth: pcard.width - 24
+                    onClicked: pcard.detailsExpanded = !pcard.detailsExpanded
+                }
+                Flow {
+                    Layout.fillWidth: true
                     visible: pcard.pending
                     spacing: 6
                     PermissionButton {
@@ -354,7 +377,6 @@ Item {
                         onClicked: Gecko.answerPermission(root.index, true, "always")
                         StyledToolTip { text: "Save a rule that always allows this exact call (edit in Settings)" }
                     }
-                    Item { Layout.fillWidth: true }
                     PermissionButton {
                         label: "Deny"
                         onClicked: Gecko.answerPermission(root.index, false)
@@ -368,7 +390,7 @@ Item {
         id: pb
         property string label
         property bool primary: false
-        implicitHeight: 32
+        implicitHeight: pbText.implicitHeight + 16
         implicitWidth: pbText.implicitWidth + 26
         buttonRadius: Appearance.rounding.full
         colBackground: primary ? Theme.permissionText : Qt.alpha(Theme.permissionText, 0.12)

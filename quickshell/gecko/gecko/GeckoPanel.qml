@@ -173,6 +173,7 @@ PanelWindow {
 
         MouseArea { // Drag the inner edge; save on release rather than on every pixel.
             id: resizeGrip
+            objectName: "panelResizeGrip"
             z: 40
             width: 10
             anchors.top: parent.top

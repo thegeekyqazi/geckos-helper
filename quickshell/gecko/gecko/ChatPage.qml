@@ -21,6 +21,7 @@ Item {
     readonly property var matches: Gecko.matchCommands(input.text)
     readonly property bool paletteOpen: matches.length > 0 && input.activeFocus
     property int paletteIndex: 0
+    property bool newOutput: false
     onMatchesChanged: paletteIndex = 0
 
     function completeCommand(cmd) {
@@ -55,6 +56,42 @@ Item {
 
         StyledListView {
             id: list
+            objectName: "chatMessages"
+            property bool followOutput: true
+            property bool followScheduled: false
+            function followEnd(force) {
+                if (force) followOutput = true;
+                if (!followOutput || followScheduled) return;
+                followScheduled = true;
+                Qt.callLater(() => {
+                    if (followOutput) positionViewAtEnd();
+                    followScheduled = false;
+                    root.newOutput = false;
+                });
+            }
+            function nearEnd() {
+                return atYEnd || contentHeight - height - (contentY - originY) < 40;
+            }
+            function preservePosition() {
+                if (followScheduled || nearEnd()) return;
+                followOutput = false;
+                const index = indexAt(1, contentY + topMargin + 1);
+                const item = itemAtIndex(index);
+                if (!item) return;
+                const offset = contentY - item.y;
+                Qt.callLater(() => {
+                    positionViewAtIndex(index, ListView.Beginning);
+                    const restored = itemAtIndex(index);
+                    if (restored) contentY = restored.y + offset;
+                });
+            }
+            onWidthChanged: preservePosition()
+            onContentHeightChanged: followEnd(false)
+            onMovementStarted: followOutput = false
+            WheelHandler {
+                target: null
+                onWheel: event => { list.followOutput = false; event.accepted = false; }
+            }
             Layout.fillWidth: true
             Layout.fillHeight: true
             leftMargin: 14
@@ -81,10 +118,25 @@ Item {
 
             Connections {
                 target: Gecko
-                function onScrollToEnd() {
-                    Qt.callLater(list.positionViewAtEnd);
+                function onBeforeEntry() {
+                    if (!list.followScheduled) list.followOutput = list.nearEnd();
+                }
+                function onScrollToEnd(force) {
+                    if (force || list.followOutput) list.followEnd(force);
+                    else root.newOutput = true;
                 }
             }
+            Connections {
+                target: Theme
+                function onFontSizeChanged() { list.preservePosition(); }
+            }
+        }
+
+        TextButton {
+            visible: root.newOutput
+            Layout.alignment: Qt.AlignHCenter
+            label: "Jump to latest"
+            onClicked: { list.followOutput = true; list.positionViewAtEnd(); root.newOutput = false; }
         }
 
         Rectangle { // Composer
@@ -204,7 +256,7 @@ Item {
 
                     RippleButton { // Send / stop
                         implicitWidth: 34
-                        implicitHeight: 34
+                        implicitHeight: Math.max(34, Theme.fontSize * 1.2 + 12)
                         buttonRadius: Appearance.rounding.full
                         readonly property bool active: Gecko.busy || input.text.trim().length > 0 || Gecko.attachments.length > 0
                         colBackground: active ? Theme.accent : Theme.surfaceHigh
@@ -225,18 +277,26 @@ Item {
         }
     }
 
-    EmptyState {
-        onPrefill: text => {
-            input.text = text;
-            input.cursorPosition = text.length;
-            input.forceActiveFocus();
-        }
+    StyledFlickable {
+        id: emptyScroller
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -40
+        anchors.top: parent.top
+        height: Math.max(0, root.height - composer.height - 40)
         anchors.margins: 20
+        contentHeight: emptyState.implicitHeight
+        clip: true
         visible: Gecko.messages.count === 0
+        EmptyState {
+            id: emptyState
+            width: parent.width
+            onPrefill: text => {
+                input.text = text;
+                input.cursorPosition = text.length;
+                input.forceActiveFocus();
+            }
+            y: Math.max(0, (emptyScroller.height - implicitHeight) / 2 - 20)
+        }
     }
 
     Rectangle { // Attach menu
@@ -248,7 +308,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 14
         anchors.bottomMargin: composer.height + 16
-        implicitWidth: 230
+        implicitWidth: Math.min(root.width - 28, Math.max(230, Theme.fontSize * 15))
         implicitHeight: attachCol.implicitHeight + 12
         radius: Theme.cardRadius
         color: Theme.popup
@@ -269,13 +329,14 @@ Item {
                     id: attachItem
                     required property var modelData
                     Layout.fillWidth: true
-                    implicitHeight: 36
+                    implicitHeight: attachRow.implicitHeight + 16
                     buttonRadius: Theme.cardRadius - 4
                     colBackground: "transparent"
                     colBackgroundHover: Theme.surface
                     colRipple: Theme.border
                     onClicked: { attachMenu.shown = false; Gecko.capture(modelData[0]); }
                     contentItem: RowLayout {
+                        id: attachRow
                         anchors.fill: parent
                         anchors.leftMargin: 10
                         spacing: 10
@@ -296,7 +357,7 @@ Item {
         anchors.leftMargin: 14
         anchors.rightMargin: 14
         anchors.bottomMargin: composer.height + 16
-        implicitHeight: Math.min(paletteList.contentHeight + 12, 320)
+        implicitHeight: Math.max(0, Math.min(paletteList.contentHeight + 12, 360, root.height - composer.height - 24))
         radius: Theme.cardRadius
         color: Theme.popup
         border.width: 1
@@ -314,36 +375,27 @@ Item {
                 required property var modelData
                 required property int index
                 width: paletteList.width
-                implicitHeight: 34
+                implicitHeight: commandRow.implicitHeight + 16
                 radius: Theme.cardRadius - 6
                 color: index === root.paletteIndex ? Theme.surface : "transparent"
-                RowLayout {
+                ColumnLayout {
+                    id: commandRow
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
-                    spacing: 8
+                    spacing: 2
                     GText {
-                        text: `/${cmdRow.modelData.name}`
+                        Layout.fillWidth: true
+                        text: `/${cmdRow.modelData.name} ${cmdRow.modelData.arg}`.trim()
                         font.family: Theme.monoFont
                         rel: 0.85
                         color: Theme.accent
-                        wrapMode: Text.NoWrap
-                    }
-                    GText {
-                        visible: cmdRow.modelData.arg.length > 0
-                        text: cmdRow.modelData.arg
-                        muted: true
-                        rel: 0.75
-                        wrapMode: Text.NoWrap
                     }
                     GText {
                         Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignRight
                         text: cmdRow.modelData.desc
                         muted: true
                         rel: 0.75
-                        elide: Text.ElideRight
-                        wrapMode: Text.NoWrap
                     }
                 }
                 MouseArea {
@@ -416,7 +468,7 @@ Item {
 
         GridLayout {
             Layout.fillWidth: true
-            columns: 2
+            columns: empty.width < Theme.fontSize * 23 ? 1 : 2
             rowSpacing: 8
             columnSpacing: 8
             Repeater {
@@ -430,7 +482,7 @@ Item {
                     id: card
                     required property var modelData
                     Layout.fillWidth: true
-                    implicitHeight: 64
+                    implicitHeight: cardColumn.implicitHeight + 24
                     buttonRadius: Theme.cardRadius
                     colBackground: Theme.surface
                     colBackgroundHover: Theme.surfaceHigh
@@ -443,6 +495,7 @@ Item {
                         }
                     }
                     contentItem: ColumnLayout {
+                        id: cardColumn
                         anchors.fill: parent
                         anchors.margins: 12
                         spacing: 2

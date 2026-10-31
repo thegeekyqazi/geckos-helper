@@ -33,7 +33,8 @@ Singleton {
     // kind: user | agent | thought | tool | permission | error
     property ListModel messages: ListModel {}
 
-    signal scrollToEnd()
+    signal beforeEntry()
+    signal scrollToEnd(bool force)
 
     // --- socket --------------------------------------------------------------
 
@@ -189,6 +190,7 @@ Singleton {
 
     // Shared by live events and transcript replay.
     function applyEntry(kind, e, live) {
+        if (live) root.beforeEntry();
         if (kind !== "agent_thought_chunk") root.endThoughts();
         switch (kind) {
         case "user_message":
@@ -265,7 +267,7 @@ Singleton {
             root.addError(e.message);
             break;
         }
-        if (live) root.scrollToEnd();
+        if (live) root.scrollToEnd(kind === "user_message");
     }
 
     // ListModel roles must be uniform, so every entry carries every role.
@@ -277,7 +279,7 @@ Singleton {
 
     function addError(text) {
         messages.append(root.entry({ kind: "error", text: text, streaming: false }));
-        root.scrollToEnd();
+        root.scrollToEnd(false);
     }
 
     // --- actions -------------------------------------------------------------
@@ -461,7 +463,7 @@ Singleton {
                     messages.setProperty(i, "permState", "pending");
             }
             root.page = "chat";
-            root.scrollToEnd();
+            root.scrollToEnd(true);
         });
     }
 
