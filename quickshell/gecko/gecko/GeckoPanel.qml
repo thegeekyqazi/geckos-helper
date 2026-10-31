@@ -183,18 +183,19 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.SizeHorCursor
             property real startWidth: 0
-            property real startX: 0
+            property real grabOffset: 0
             property real draggedWidth: Theme.panelWidth
             onPressed: mouse => {
                 startWidth = Theme.panelWidth;
-                startX = mapToGlobal(mouse.x, mouse.y).x;
+                const x = mapToItem(background, mouse.x, mouse.y).x;
+                grabOffset = startWidth - (Theme.rightSide ? background.width - x : x);
                 draggedWidth = startWidth;
             }
             onPositionChanged: mouse => {
                 if (!pressed) return;
-                const delta = mapToGlobal(mouse.x, mouse.y).x - startX;
+                const x = mapToItem(background, mouse.x, mouse.y).x;
                 draggedWidth = Math.min(Theme.maxWidth, Math.max(Theme.minWidth,
-                    startWidth + delta * (Theme.rightSide ? -1 : 1)));
+                    (Theme.rightSide ? background.width - x : x) + grabOffset));
             }
             onReleased: Theme.setWidth(draggedWidth)
             Rectangle {
