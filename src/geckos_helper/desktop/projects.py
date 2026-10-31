@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 from ..config import load_config
-from .obsidian import TASK_RE, vault
+from .obsidian import TASK_RE, _resolve, vault
 
 STATUSES = {"idea": "⬜ Idea", "active": "🟡 Active", "on-hold": "⏸️ On hold", "done": "✅ Done"}
 DUE_RE = re.compile(r"📅 (\d{4}-\d{2}-\d{2})")
@@ -37,11 +37,11 @@ FRONT_RE = re.compile(r"^---\n(.*?)\n---\n", re.S)
 
 
 def folder() -> Path:
-    return vault() / load_config()["desktop"].get("projects_folder", "Projects")
+    return _resolve(load_config()["desktop"].get("projects_folder", "Projects"))
 
 
 def ideas_note() -> Path:
-    return vault() / load_config()["desktop"]["obsidian_inbox"]
+    return _resolve(load_config()["desktop"]["obsidian_inbox"])
 
 
 def _slug(title: str) -> str:
@@ -76,6 +76,7 @@ def _tracked_notes() -> list[Path]:
             continue
         if p == ideas_note():
             continue
+        p = _resolve(str(rel))  # also reject symlinks leaving the vault
         head = p.read_text(errors="replace")[:600]
         if _front(head).get("type") in ("project", "goal"):
             found.append(p)
@@ -139,8 +140,12 @@ def create(title: str, goal: str, tasks: list[str], category: str = "💻 Tech &
 
 def adopt(note: str, kind: str = "project", status: str = "active", category: str = "") -> dict:
     """Start tracking an existing note where it is (adds frontmatter and a progress log)."""
-    p = vault() / note if (vault() / note).exists() else next(
-        (q for q in vault().rglob("*.md") if q.stem.lower() == note.removesuffix(".md").lower()), None)
+    if status not in STATUSES:
+        raise ValueError(f"status must be one of {list(STATUSES)}")
+    p = _resolve(note)
+    if not p.exists():
+        p = next((_resolve(str(q.relative_to(vault()))) for q in vault().rglob("*.md")
+                  if q.stem.lower() == note.removesuffix(".md").lower()), None)
     if not p:
         raise FileNotFoundError(f"No note {note!r}")
     text = p.read_text()
