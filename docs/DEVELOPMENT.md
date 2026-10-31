@@ -85,3 +85,11 @@ Quickshell panel (qs -c gecko)  ──unix socket, JSON lines──►  gecko da
 - **`qs ipc call … prefill "/"`** mangles a bare `/`; use `/x` when testing.
 - Don't `pkill -f "gecko daemon"` from a shell whose command line contains that text.
 - After a crash, git objects can be left empty; `sync` after commits.
+
+## Safety regression tests
+
+Run `python -m unittest discover -s tests -v` in the project's Python environment.
+The suite uses temporary files and mocked desktop/agent integrations; process-lifecycle
+checks launch only local Python fixtures, never Claude or external services. It covers
+vault boundaries, kill/capability checks, background budgets/cancellation, recipe parsing,
+schedules, trigger fanout, injection scanning and approval scope/lifecycle.
