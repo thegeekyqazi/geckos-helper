@@ -433,11 +433,7 @@ def recipe_create(recipe_id: str, name: str, prompt: str, daily_at: list[str] | 
     """
     path = recipes.create(recipe_id, name, prompt, daily_at=daily_at, weekly_at=weekly_at,
                           every_minutes=every_minutes, output=output, model=model,
-                          fetch_domains=fetch_domains, enabled=enabled)
-    if triggers:  # TOML array of tables
-        with path.open("a") as f:
-            for t in triggers:
-                f.write(f"\n[[triggers]]\ntype = {json.dumps(t['type'])}\nvalue = {json.dumps(t.get('value'))}\n")
+                          fetch_domains=fetch_domains, enabled=enabled, triggers=triggers)
     return f"saved {path}"
 
 

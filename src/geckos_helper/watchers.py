@@ -43,7 +43,22 @@ Otherwise false."""
 
 def load() -> list[dict]:
     try:
-        return json.loads(WATCHERS_FILE.read_text())
+        items = json.loads(WATCHERS_FILE.read_text())
+        if not isinstance(items, list):
+            return []
+        out = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            w = dict(item)
+            try:
+                schedule.validate(w)
+                if not all(isinstance(w.get(k), str) and w[k] for k in ("id", "name", "prompt")):
+                    raise ValueError("Watcher needs id, name and prompt")
+            except (ValueError, TypeError, AttributeError) as e:
+                w.update(paused=True, error=str(e))
+            out.append(w)
+        return out
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
@@ -80,13 +95,13 @@ def update(watcher_id: str, **fields: Any) -> None:
 
 
 def next_run(w: dict, now: float | None = None) -> float | None:
-    if w.get("paused"):
+    if w.get("paused") or w.get("error"):
         return None
     return schedule.next_run(w, w.get("last_run"), w.get("created"), now)
 
 
 def schedule_text(w: dict) -> str:
-    return schedule.describe(w)
+    return f"Invalid schedule: {w['error']}" if w.get("error") else schedule.describe(w)
 
 
 def describe(w: dict) -> dict:

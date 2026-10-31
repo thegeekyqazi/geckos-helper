@@ -81,20 +81,47 @@ def files() -> dict[str, Path]:
     return found
 
 
+def validate(r: dict) -> None:
+    for key in ("name", "prompt"):
+        if not isinstance(r.get(key), str) or not r[key].strip():
+            raise ValueError(f"{key} must be nonempty text")
+    if "enabled" in r and type(r["enabled"]) is not bool:
+        raise ValueError("enabled must be true or false")
+    if r.get("output", "inbox") not in ("inbox", "notify", "both"):
+        raise ValueError("output must be inbox, notify or both")
+    if any(r.get(k) is not None for k in ("every_minutes", "daily_at", "weekly_at")):
+        schedule.validate(r)
+    ts = r.get("triggers") or []
+    if not isinstance(ts, list):
+        raise ValueError("triggers must be an array of tables")
+    for t in ts:
+        if not isinstance(t, dict) or t.get("type") not in (
+                "battery_below", "event_soon", "file_added", "notification_from"):
+            raise ValueError("Unknown or malformed trigger")
+        value = t.get("value")
+        if t["type"] in ("battery_below", "event_soon"):
+            if type(value) is not int or value <= 0 or (t["type"] == "battery_below" and value > 100):
+                raise ValueError("Trigger threshold must be a positive integer (battery: 1–100)")
+        elif not isinstance(value, str) or not value.strip():
+            raise ValueError("File/notification triggers need nonempty text values")
+
+
 def load() -> list[dict]:
     state = _state()
     out = []
     for rid, path in files().items():
         try:
             r = tomllib.loads(path.read_text())
-        except tomllib.TOMLDecodeError as e:
-            out.append({"id": rid, "name": rid, "error": f"{path.name}: {e}", "enabled": False})
+            validate(r)
+        except (OSError, ValueError, TypeError, KeyError, AttributeError) as e:
+            out.append({"id": rid, "name": rid, "file": str(path), "bundled": path.parent == BUNDLED,
+                        "error": f"{path.name}: {e}", "enabled": False})
             continue
         st = state.get(rid, {})
         out.append({**r, "id": rid, "file": str(path), "bundled": path.parent == BUNDLED,
                     "enabled": st.get("enabled", r.get("enabled", False)),
                     "last_run": st.get("last_run"), "created": st.setdefault("created", time.time())})
-    _save_state({**state, **{r["id"]: {**state.get(r["id"], {}), "created": r["created"]} for r in out}})
+    _save_state({**state, **{r["id"]: {**state.get(r["id"], {}), "created": r["created"]} for r in out if "created" in r}})
     return out
 
 
@@ -145,17 +172,22 @@ def create(rid: str, name: str, prompt: str, **fields: Any) -> Path:
     """Write a new recipe file to the user's recipe folder (used by the agent tool)."""
     if not re.fullmatch(r"[a-z0-9-]{2,40}", rid):
         raise ValueError("id must be 2-40 characters of a-z, 0-9 and -")
-    if any(fields.get(k) for k in ("every_minutes", "daily_at", "weekly_at")):
-        schedule.validate(fields)
+    r = {"name": name, "prompt": prompt, **{k: v for k, v in fields.items() if v is not None}}
+    validate(r)
+    def encoded(v):
+        return json.dumps(v, ensure_ascii=False)
+    lines = [f"name = {encoded(name)}", f"prompt = {encoded(prompt)}"]
+    for k, v in fields.items():
+        if k != "triggers" and v not in (None, [], ""):
+            lines.append(f"{k} = {encoded(v)}")
+    for t in r.get("triggers") or []:
+        lines += ["", "[[triggers]]", f"type = {encoded(t['type'])}", f"value = {encoded(t['value'])}"]
+    text = "\n".join(lines) + "\n"
+    validate(tomllib.loads(text))  # reject anything we cannot read before creating a file
     USER.mkdir(parents=True, exist_ok=True)
     path = USER / f"{rid}.toml"
-    if path.exists():
-        raise FileExistsError(f"Recipe {rid} exists; edit {path}")
-    lines = [f"name = {json.dumps(name)}", f"prompt = {json.dumps(prompt)}"]
-    for k, v in fields.items():
-        if v not in (None, [], ""):
-            lines.append(f"{k} = {json.dumps(v)}")
-    path.write_text("\n".join(lines) + "\n")
+    with path.open("x") as f:
+        f.write(text)
     return path
 
 

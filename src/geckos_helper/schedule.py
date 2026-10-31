@@ -13,15 +13,24 @@ DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
 def _hm(t: str) -> tuple[int, int]:
+    if not isinstance(t, str):
+        raise ValueError("Time must be a string like '08:30'")
     h, m = t.strip().split(":")
-    return int(h), int(m)
+    h, m = int(h), int(m)
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        raise ValueError("Time must have an hour 0–23 and a minute 0–59")
+    return h, m
 
 
 def validate(s: dict) -> None:
     if not (s.get("every_minutes") or s.get("daily_at") or s.get("weekly_at")):
         raise ValueError("Give every_minutes, daily_at (['07:30']) or weekly_at (['sun 18:00'])")
-    if s.get("every_minutes") and s["every_minutes"] < 15:
-        raise ValueError("every_minutes must be at least 15")
+    interval = s.get("every_minutes")
+    if interval is not None and (type(interval) is not int or interval < 15):
+        raise ValueError("every_minutes must be an integer of at least 15")
+    for field in ("daily_at", "weekly_at"):
+        if s.get(field) is not None and not isinstance(s[field], list):
+            raise ValueError(f"{field} must be a list of times")
     for t in s.get("daily_at") or []:
         _hm(t)
     for t in s.get("weekly_at") or []:
@@ -32,7 +41,8 @@ def validate(s: dict) -> None:
 
 
 def next_run(s: dict, last: float | None, created: float | None = None, now: float | None = None) -> float | None:
-    now = now or time.time()
+    validate(s)
+    now = now if now is not None else time.time()
     if s.get("every_minutes"):
         return last + s["every_minutes"] * 60 if last else now
     ref = last or created or now
