@@ -209,6 +209,7 @@ async def run(r: dict, trigger: str = "") -> dict:
         if text == "NOTHING" or not text:
             entry["report"] = None
         else:
+            verdict = await guard.scan(text)  # include suggested to-dos in the scan
             todos = []
             if m := TODOS_RE.search(text):
                 todos = [t.strip(" -*•\t") for t in m[1].splitlines() if t.strip(" -*•\t")][:6]
@@ -216,7 +217,6 @@ async def run(r: dict, trigger: str = "") -> dict:
             title, _, body = text.partition("\n")
             entry["report"] = {"title": title.lstrip("# ").strip() or r["name"], "body": body.strip(),
                                "todos": todos}
-            verdict = await guard.scan(text)
             entry["flagged"] = verdict.suspicious
             if verdict.suspicious:
                 entry["guard"] = verdict.reasons
