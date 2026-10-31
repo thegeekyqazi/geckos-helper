@@ -10,7 +10,7 @@ from . import access
 ACTIVE: set[asyncio.Task] = set()
 
 
-async def _stop(proc) -> None:
+async def stop(proc) -> None:
     # Each invocation gets its own session; stop MCP descendants as well as the CLI.
     with contextlib.suppress(ProcessLookupError):
         os.killpg(proc.pid, signal.SIGTERM)
@@ -47,7 +47,7 @@ async def run(argv: list[str], text: str, timeout: float, *, cwd=None, capabilit
     finally:
         try:
             if proc is not None:
-                await _stop(proc)
+                await stop(proc)
         finally:
             ACTIVE.discard(task)
 

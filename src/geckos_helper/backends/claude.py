@@ -9,7 +9,7 @@ import json
 import uuid
 from typing import Any
 
-from .. import paths
+from .. import access, agent_process, paths
 from ..config import expand
 from . import Emit
 
@@ -44,6 +44,8 @@ class ClaudeBackend:
         self.extra_dirs = list(extra_dirs)
         self.proc: asyncio.subprocess.Process | None = None
         self._reader: asyncio.Task | None = None
+        self._spawn_task: asyncio.Task | None = None
+        self._closing = False
         self.busy = False
         self._pending_inputs: dict[str, dict] = {}
 
@@ -76,11 +78,26 @@ class ClaudeBackend:
         return argv
 
     async def _start(self) -> None:
+        access.require()
+        if self._closing:
+            raise PermissionError("This agent has been stopped")
         with STDERR_LOG.open("ab") as err:
-            self.proc = await asyncio.create_subprocess_exec(
-                *self.argv(), cwd=paths.WORKSPACE, limit=STREAM_LIMIT,
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=err,
-            )
+            self._spawn_task = asyncio.create_task(asyncio.create_subprocess_exec(
+                *self.argv(), cwd=paths.WORKSPACE, limit=STREAM_LIMIT, start_new_session=True,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=err))
+            try:
+                self.proc = await asyncio.shield(self._spawn_task)
+            except asyncio.CancelledError:
+                self.proc = await self._spawn_task
+                await agent_process.stop(self.proc)
+                raise
+        try:
+            access.require()
+            if self._closing:
+                raise PermissionError("This agent has been stopped")
+        except PermissionError:
+            await agent_process.stop(self.proc)
+            raise
         self._reader = asyncio.create_task(self._read())
         await self._send({"type": "control_request", "request_id": str(uuid.uuid4()),
                           "request": {"subtype": "initialize"}})
@@ -92,8 +109,12 @@ class ClaudeBackend:
 
     async def prompt(self, content: str | list[dict]) -> None:
         """content: plain text, or a list of content blocks (text, images) for attachments."""
+        access.require()
+        if self._closing:
+            raise PermissionError("This agent has been stopped")
         if not self.alive:
             await self._start()
+        access.require()
         self.busy = True
         await self._send({"type": "user", "message": {"role": "user", "content": content}})
 
@@ -112,13 +133,18 @@ class ClaudeBackend:
                               "request": {"subtype": "interrupt"}})
 
     async def close(self) -> None:
-        if self.alive:
-            assert self.proc and self.proc.stdin
-            self.proc.stdin.close()
-            try:
-                await asyncio.wait_for(self.proc.wait(), 5)
-            except TimeoutError:
-                self.proc.terminate()
+        self._closing = True
+        if self.proc is None and self._spawn_task is not None:
+            self.proc = await asyncio.shield(self._spawn_task)
+        if self.proc is not None:
+            if self.alive:
+                assert self.proc.stdin
+                self.proc.stdin.close()
+                try:
+                    await asyncio.wait_for(self.proc.wait(), 2)
+                except TimeoutError:
+                    pass
+            await agent_process.stop(self.proc)
         if self._reader:
             await asyncio.gather(self._reader, return_exceptions=True)
 
