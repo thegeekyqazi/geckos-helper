@@ -65,10 +65,16 @@ Rectangle {
         }
         MenuItem {
             iconName: "ios_share"
-            label: Gecko.exporting ? "Writing brief…" : "Hand off to Claude.ai"
-            hint: "Short brief to paste into another chat"
+            label: Gecko.exporting ? "Writing brief…" : "Continue in another AI chat"
+            hint: "Preview and edit for Claude.ai or ChatGPT"
             enabled: Gecko.chatId.length > 0 && !Gecko.exporting
             onClicked: Gecko.exportChat("brief", () => root.shown = false)
+        }
+        MenuItem {
+            visible: Gecko.handoffText.length > 0
+            iconName: "draft"
+            label: "Return to handoff draft"
+            onClicked: { Gecko.page = "handoff"; root.shown = false; }
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.margins: 4 }
         MenuItem {

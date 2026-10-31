@@ -40,9 +40,14 @@ Singleton {
     property int nextId: 1
     property var callbacks: ({})
 
-    function call(op, args, cb) {
+    function call(op, args, cb, onError) {
+        if (!socket.connected) {
+            if (onError) onError({ error: "Gecko is offline" });
+            else root.showToast("Gecko is offline. Try again after reconnecting.");
+            return;
+        }
         const id = root.nextId++;
-        if (cb) root.callbacks[id] = cb;
+        if (cb || onError) root.callbacks[id] = { success: cb, error: onError };
         socket.write(JSON.stringify(Object.assign({ id: id, op: op }, args ?? {})) + "\n");
         socket.flush();
     }
@@ -51,7 +56,16 @@ Singleton {
         id: socket
         path: `${Quickshell.env("XDG_RUNTIME_DIR")}/geckos-helper.sock`
         connected: true
-        onConnectedChanged: if (connected) root.refreshAll()
+        onConnectedChanged: {
+            if (connected) root.refreshAll();
+            else {
+                const pending = root.callbacks;
+                root.callbacks = ({});
+                for (const cb of Object.values(pending)) {
+                    if (cb.error) cb.error({ error: "Connection lost" });
+                }
+            }
+        }
         parser: SplitParser {
             onRead: line => root.handle(JSON.parse(line))
         }
@@ -72,11 +86,10 @@ Singleton {
             const cb = root.callbacks[msg.reply];
             delete root.callbacks[msg.reply];
             if (!msg.ok) {
-                root.exporting = false;
-                if (!msg.error.startsWith("AttributeError")) root.addError(msg.error);
-                else console.warn("[Gecko] daemon lacks op:", msg.error);
+                if (cb?.error) cb.error(msg);
+                root.addError(msg.error || "Request failed");
             }
-            else if (cb) cb(msg);
+            else if (cb?.success) cb.success(msg);
             return;
         }
         if (msg.event) root.handleEvent(msg);
@@ -353,7 +366,7 @@ Singleton {
         { name: "model", arg: "sonnet|opus|haiku", desc: "Switch this chat's model", run: a => { root.setModel(a); root.showToast(`Model: ${a}`); } },
         { name: "theme", arg: "[name]", desc: "Next theme, or switch to one", run: a => root.call("theme", a ? { name: a } : { step: 1 }) },
         { name: "briefing", arg: "", desc: "Run the daily briefing now", run: a => { root.call("recipes", { run: "daily-briefing" }); root.showToast("Briefing running; it'll land in your inbox"); } },
-        { name: "handoff", arg: "", desc: "Copy a hand-off brief for Claude.ai", run: a => root.exportChat("brief") },
+        { name: "handoff", arg: "", desc: "Preview a brief for another AI chat", run: a => { root.open = true; root.exportChat("brief"); } },
         { name: "copy", arg: "", desc: "Copy this chat as markdown", run: a => root.exportChat("transcript") },
         { name: "calendar", arg: "", desc: "Open the calendar", run: a => root.page = "calendar" },
         { name: "inbox", arg: "", desc: "Open the inbox", run: a => root.page = "inbox" },
@@ -550,17 +563,31 @@ Singleton {
         root.call("capability", { name: name, on: on });
     }
 
-    // Copy this chat to the clipboard to continue elsewhere. mode: transcript | brief
+    // Online-chat handoffs are reviewed before copying; raw transcript stays separate.
     property bool exporting: false
+    property bool copyingHandoff: false
+    property string handoffText: ""
+    property var handoffWarnings: []
     function exportChat(mode, cb) {
-        if (!root.chatId) return;
+        if (!root.chatId || root.exporting) return;
         root.exporting = true;
-        root.call("export", { chat: root.chatId, mode: mode }, r => {
+        root.call("export", { chat: root.chatId, mode: mode, preview: mode === "brief" }, r => {
             root.exporting = false;
-            Quickshell.execDetached(["notify-send", "-a", "Gecko's Helper", "Copied to clipboard",
-                mode === "brief" ? "Hand-off brief ready to paste into Claude.ai" : "Chat transcript copied"]);
+            if (mode === "brief") {
+                root.handoffText = r.text;
+                root.handoffWarnings = r.warnings ?? [];
+                root.page = "handoff";
+            } else root.showToast("Chat transcript copied");
             if (cb) cb(r);
-        });
+        }, () => { root.exporting = false; root.showToast("Export failed. Try again from the menu."); });
+    }
+    function copyHandoff(text) {
+        if (root.copyingHandoff || !text.trim()) return;
+        root.copyingHandoff = true;
+        root.call("copy_handoff", { text: text }, r => {
+            root.copyingHandoff = false;
+            root.showToast("Handoff copied. Paste it into Claude.ai, ChatGPT or another chat.");
+        }, () => { root.copyingHandoff = false; root.showToast("Copy failed; your preview is still here."); });
     }
 
     function cycleTheme(step) {
