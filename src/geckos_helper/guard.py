@@ -13,6 +13,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
+from . import agent_process
 from .config import expand, load_config
 
 # (pattern, weight): weight 2 = strong signal on its own, 1 = weak
@@ -71,11 +72,12 @@ def scan_patterns(text: str) -> Verdict:
 
 async def model_check(text: str) -> tuple[bool, str]:
     claude = str(expand(load_config()["agents"]["claude"]["path"]))
-    proc = await asyncio.create_subprocess_exec(
-        claude, "-p", "--model", "haiku", "--tools", "", "--setting-sources", "",
-        "--strict-mcp-config", "--no-session-persistence",
-        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-    out, _ = await asyncio.wait_for(proc.communicate(MODEL_PROMPT.format(text=text[:8000]).encode()), 90)
+    out, _, status = await agent_process.run(
+        [claude, "-p", "--model", "haiku", "--tools", "", "--setting-sources", "",
+         "--strict-mcp-config", "--no-session-persistence"],
+        MODEL_PROMPT.format(text=text[:8000]), 90)
+    if status:
+        raise RuntimeError("Guard model check failed")
     m = re.search(r"\{.*\}", out.decode(), re.S)
     result = json.loads(m[0]) if m else {}
     return bool(result.get("injection")), result.get("reason", "")

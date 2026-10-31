@@ -8,6 +8,7 @@ Two forms:
 import asyncio
 import subprocess
 
+from . import agent_process
 from .config import expand, load_config
 from .store import Store
 
@@ -41,12 +42,11 @@ def transcript(store: Store, chat_id: str) -> str:
 async def brief(store: Store, chat_id: str, model: str = "haiku") -> str:
     text = transcript(store, chat_id)[-MAX_TRANSCRIPT:]
     claude = str(expand(load_config()["agents"]["claude"]["path"]))
-    proc = await asyncio.create_subprocess_exec(
-        claude, "-p", "--model", model, "--tools", "", "--setting-sources", "",
-        "--strict-mcp-config", "--no-session-persistence",
-        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    out, err = await asyncio.wait_for(proc.communicate(BRIEF_PROMPT.format(transcript=text).encode()), 180)
-    if proc.returncode:
+    out, err, status = await agent_process.run(
+        [claude, "-p", "--model", model, "--tools", "", "--setting-sources", "",
+         "--strict-mcp-config", "--no-session-persistence"],
+        BRIEF_PROMPT.format(transcript=text), 180, capability="clipboard_write")
+    if status:
         raise RuntimeError(f"brief failed: {err.decode(errors='replace')[-500:]}")
     return out.decode().strip() + "\n"
 

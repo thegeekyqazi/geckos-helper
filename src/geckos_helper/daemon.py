@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Any
 
-from . import (access, activity, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+from . import (access, activity, agent_process, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, notes, obsidian, projects, todo
@@ -74,6 +74,7 @@ class Daemon:
         self.taint: dict[str, dict] = load_taint()
         self.usage: dict[str, Any] = {}
         self.watcher_lock = asyncio.Lock()
+        self.background_tasks: dict[tuple[str, str], asyncio.Task] = {}
         self.budget_logged = 0.0
         self.triggers = triggers.Triggers()
 
@@ -276,11 +277,13 @@ class Daemon:
     async def op_kill(self, req: dict) -> dict:
         on = bool(req["on"])
         config.set_killed(on)
+        await self.broadcast({"event": "kill_switch", "on": on})
         if on:
-            await asyncio.gather(*(b.close() for b in list(self.backends.values())))
+            await self.stop_background()
+            await agent_process.stop_all()
+            await asyncio.gather(*(b.close() for b in list(self.backends.values())), return_exceptions=True)
             self.backends.clear()
         context.generate_lite()
-        await self.broadcast({"event": "kill_switch", "on": on})
         return {"killed": on}
 
     async def op_capability(self, req: dict) -> dict:
@@ -326,7 +329,7 @@ class Daemon:
         elif req.get("run"):
             access.require("watchers")
             w = next(w for w in watchers.load() if w["id"] == req["run"])
-            asyncio.create_task(self.run_watcher(w))
+            self.queue_background("watcher", w)
         return {"watchers": [watchers.describe(w) for w in watchers.load()]}
 
     async def op_calendar(self, req: dict) -> dict:
@@ -403,7 +406,7 @@ class Daemon:
             recipes.set_enabled(req.get("enable") or req["disable"], bool(req.get("enable")))
         elif req.get("run"):
             access.require("recipes")
-            asyncio.create_task(self.run_recipe(recipes.get(req["run"])))
+            self.queue_background("recipe", recipes.get(req["run"]))
         return {"recipes": [recipes.describe(r) for r in recipes.load()]}
 
     async def op_rules(self, req: dict) -> dict:
@@ -459,7 +462,9 @@ class Daemon:
             await asyncio.sleep(1.5)
 
     async def run_watcher(self, w: dict) -> None:
-        async with self.watcher_lock:  # one at a time, so they don't pile up on usage
+        async with self.watcher_lock:  # check after waiting, not just when queued
+            if not self.background_allowed("watchers"):
+                return
             await self.broadcast({"event": "watcher_running", "on": True, "name": w["name"]})
             try:
                 entry = await watchers.run(w)
@@ -477,6 +482,8 @@ class Daemon:
 
     async def run_recipe(self, r: dict, trigger: str = "") -> dict:
         async with self.watcher_lock:  # shares the one-at-a-time slot with watchers
+            if not self.background_allowed("recipes"):
+                return {"skipped": True}
             await self.broadcast({"event": "watcher_running", "on": True, "name": r["name"]})
             try:
                 entry = await recipes.run(r, trigger)
@@ -497,22 +504,58 @@ class Daemon:
                               "kind": "recipe"})
         return entry
 
+    def background_allowed(self, capability: str) -> bool:
+        try:
+            access.require(capability)
+        except PermissionError:
+            return False
+        return self.budget_ok()
+
+    def queue_background(self, kind: str, item: dict, trigger: str = "") -> None:
+        capability = "watchers" if kind == "watcher" else "recipes"
+        access.require(capability)
+        if not self.budget_ok():
+            raise PermissionError("Background usage budget is exhausted or paused")
+        key = (kind, item["id"])
+        if key in self.background_tasks:
+            return  # includes both queued and running jobs
+        if item.get("error"):
+            raise ValueError(item["error"])
+        task = asyncio.create_task(self.run_watcher(item) if kind == "watcher" else self.run_recipe(item, trigger))
+        self.background_tasks[key] = task
+        def finished(done):
+            self.background_tasks.pop(key, None)
+            if not done.cancelled() and (error := done.exception()):
+                log.error("Background %s failed: %s", key, error)
+        task.add_done_callback(finished)
+
+    async def stop_background(self) -> None:
+        tasks = list(self.background_tasks.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self.background_tasks.clear()
+
     async def schedule_unattended(self) -> None:
-        """Run due watchers and recipes within the usage budget."""
+        """Queue once; recheck access and budget after taking the execution slot."""
         while True:
             await asyncio.sleep(30)
             try:
-                if not self.budget_ok():
+                if config.load_state()["killed"] or not self.budget_ok():
                     continue
-                for w in watchers.due():
-                    watchers.update(w["id"], last_run=time.time())  # don't re-queue while running
-                    asyncio.create_task(self.run_watcher(w))
-                for r in recipes.due():
-                    recipes._mark_run(r["id"])
-                    asyncio.create_task(self.run_recipe(r))
-                for r, why in await asyncio.to_thread(self.triggers.poll):
-                    activity.log("trigger", recipe=r["id"], why=why[:200])
-                    asyncio.create_task(self.run_recipe(r, why))
+                if config.load_state()["capabilities"].get("watchers"):
+                    for w in watchers.due():
+                        self.queue_background("watcher", w)
+                if config.load_state()["capabilities"].get("recipes"):
+                    for r in recipes.due():
+                        self.queue_background("recipe", r)
+                    for r, why in await asyncio.to_thread(self.triggers.poll):
+                        if config.load_state()["killed"]:
+                            break
+                        activity.log("trigger", recipe=r["id"], why=why[:200])
+                        self.queue_background("recipe", r, why)
+            except PermissionError:
+                pass  # switch/budget changed while polling
             except Exception:
                 log.exception("scheduler")
 
@@ -545,12 +588,18 @@ class Daemon:
         server = await asyncio.start_unix_server(self.handle_client, path=str(paths.SOCKET), limit=16 * 2**20)
         os.chmod(paths.SOCKET, 0o600)
         log.info("listening on %s", paths.SOCKET)
-        asyncio.create_task(self.reap_idle())
-        asyncio.create_task(self.watch_theme())
-        asyncio.create_task(self.schedule_unattended())
-        asyncio.create_task(self.refresh_calendar_feed())
-        async with server:
-            await server.serve_forever()
+        tasks = [asyncio.create_task(coro()) for coro in (
+            self.reap_idle, self.watch_theme, self.schedule_unattended, self.refresh_calendar_feed)]
+        try:
+            async with server:
+                await server.serve_forever()
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await self.stop_background()
+            await agent_process.stop_all()
+            await asyncio.gather(*(b.close() for b in list(self.backends.values())), return_exceptions=True)
 
 
 def main() -> None:

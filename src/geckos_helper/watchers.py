@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from . import activity, guard, paths, profiles, schedule
+from . import activity, agent_process, guard, paths, profiles, schedule
 from .config import load_state
 from .desktop import system
 
@@ -119,15 +119,13 @@ async def run(w: dict) -> dict:
     """Run one watcher now. Notifies on `notify: true`; never takes actions."""
     prompt = PROMPT.format(prompt=w["prompt"], now=datetime.now().strftime("%A %Y-%m-%d %H:%M"),
                            last=json.dumps(w.get("last_result")) if w.get("last_result") else "nothing yet")
-    proc = await asyncio.create_subprocess_exec(
-        *profiles.unattended_argv(w.get("model") or "haiku", w.get("fetch_domains")),
-        cwd=paths.WORKSPACE, stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     entry: dict[str, Any] = {"name": w["name"], "watcher": w["id"]}
     try:
-        out, err = await asyncio.wait_for(proc.communicate(prompt.encode()), 300)
-        if proc.returncode:
-            raise RuntimeError(err.decode(errors="replace")[-300:] or f"exit {proc.returncode}")
+        out, err, status = await agent_process.run(
+            profiles.unattended_argv(w.get("model") or "haiku", w.get("fetch_domains")),
+            prompt, 300, cwd=paths.WORKSPACE, capability="watchers")
+        if status:
+            raise RuntimeError(err.decode(errors="replace")[-300:] or f"exit {status}")
         result = _parse(out.decode())
         entry |= {"notified": bool(result.get("notify")), "title": result.get("title", ""),
                   "message": result.get("message", "")}
@@ -138,9 +136,10 @@ async def run(w: dict) -> dict:
         if entry["notified"]:
             system.send_notification(f"🦎 {entry['title'] or w['name']}", entry["message"])
         update(w["id"], last_run=time.time(), last_result=result)
+    except asyncio.CancelledError:
+        activity.log("watcher", name=w["name"], watcher=w["id"], error="Cancelled")
+        raise
     except Exception as e:
-        if proc.returncode is None:
-            proc.kill()
         entry |= {"notified": False, "error": str(e)[:300]}
         update(w["id"], last_run=time.time())
     activity.log("watcher", **entry)

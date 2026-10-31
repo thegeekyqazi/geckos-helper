@@ -30,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import activity, guard, paths, profiles, schedule
+from . import activity, agent_process, guard, paths, profiles, schedule
 from .config import load_state
 from .desktop import system, untrusted
 
@@ -196,15 +196,13 @@ async def run(r: dict, trigger: str = "") -> dict:
     _mark_run(r["id"])
     prompt = PROMPT.format(name=r["name"], prompt=r["prompt"], now=datetime.now().strftime("%A %Y-%m-%d %H:%M"),
                            trigger=f"\nWhy now:\n{untrusted('trigger', trigger)}\n" if trigger else "")
-    proc = await asyncio.create_subprocess_exec(
-        *profiles.unattended_argv(r.get("model") or "haiku", r.get("fetch_domains")),
-        cwd=paths.WORKSPACE, stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     entry: dict[str, Any] = {"name": r["name"], "recipe": r["id"], "trigger": trigger[:200]}
     try:
-        out, err = await asyncio.wait_for(proc.communicate(prompt.encode()), 600)
-        if proc.returncode:
-            raise RuntimeError(err.decode(errors="replace")[-300:] or f"exit {proc.returncode}")
+        out, err, status = await agent_process.run(
+            profiles.unattended_argv(r.get("model") or "haiku", r.get("fetch_domains")),
+            prompt, 600, cwd=paths.WORKSPACE, capability="recipes")
+        if status:
+            raise RuntimeError(err.decode(errors="replace")[-300:] or f"exit {status}")
         text = out.decode().strip()
         if text == "NOTHING" or not text:
             entry["report"] = None
@@ -220,9 +218,10 @@ async def run(r: dict, trigger: str = "") -> dict:
             entry["flagged"] = verdict.suspicious
             if verdict.suspicious:
                 entry["guard"] = verdict.reasons
+    except asyncio.CancelledError:
+        activity.log("recipe", name=r["name"], recipe=r["id"], error="Cancelled")
+        raise
     except Exception as e:
-        if proc.returncode is None:
-            proc.kill()
         entry["error"] = str(e)[:300]
     activity.log("recipe", **{k: v for k, v in entry.items() if k != "report"},
                  title=(entry.get("report") or {}).get("title"))
