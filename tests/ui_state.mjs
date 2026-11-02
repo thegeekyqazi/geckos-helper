@@ -108,7 +108,7 @@ assert.equal(root.defaultPermissionMode, 'default');
 assert.equal(root.permissionLabel('bypassPermissions'), 'Full access');
 console.log('Permission UI checks passed: busy, rejected/offline changes, confirmed selection, chat isolation, separate default.');
 
-for (const name of ['applyEntry', 'trackGlobal', 'handleEvent', 'send']) {
+for (const name of ['applyEntry', 'trackGlobal', 'handleEvent', 'send', 'clearTaint']) {
     vm.runInContext(extract('Gecko.qml', name), ctx);
     root[name] = ctx[name];
 }
@@ -139,5 +139,16 @@ vm.runInContext(extract('ChatPage.qml', 'submit'), ctx);
 ctx.submit();
 assert.equal(ctx.input.text, 'Keep this draft');
 root.handleEvent({event: 'guard_cleared', chat: 'guard-fixture'});
+assert.equal(root.tainted, false);
+root.applyEntry('guard_alert', {source: '/fixture/old.txt', reasons: ['old signal']}, false);
+assert.equal(root.tainted, false); // history cannot reinstate a cleared warning
+socket.connected = true;
+root.tainted = true;
+root.clearTaint();
+root.chatId = 'other-guarded-chat';
+root.handle({reply: writes.at(-1).id, ok: true});
+assert.equal(root.tainted, true); // a late clear cannot unlock another chat
+root.clearTaint();
+root.handle({reply: writes.at(-1).id, ok: true});
 assert.equal(root.tainted, false);
 console.log('Guard UI checks passed: review block, stopped state, source label, retained draft and explicit clear event.');

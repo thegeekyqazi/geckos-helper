@@ -269,7 +269,7 @@ Singleton {
         case "guard_alert":
             messages.append(root.entry({ kind: "guard", title: e.source, text: (e.reasons ?? []).join(", "),
                                         extra: JSON.stringify({ paused: !!e.paused }) }));
-            root.tainted = true;
+            if (live) root.tainted = true;
             if (live && e.paused) root.busy = false;
             break;
         case "turn_end":
@@ -533,7 +533,10 @@ Singleton {
     // This chat read content that looked like a prompt injection
     property bool tainted: false
     function clearTaint() {
-        root.call("untaint", { chat: root.chatId }, () => root.tainted = false);
+        const chat = root.chatId;
+        root.call("untaint", { chat: chat }, () => {
+            if (root.chatId === chat) root.tainted = false;
+        });
     }
 
     function deleteChat(id) {
