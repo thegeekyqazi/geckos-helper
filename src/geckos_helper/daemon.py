@@ -15,7 +15,7 @@ import time
 from datetime import date
 from typing import Any
 
-from . import (access, activity, agent_process, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, recipes, rules, theme,
+from . import (access, activity, agent_process, attachments, budget, calendar_feed, config, context, guard, handoff_export, memory, paths, permissions, recipes, rules, theme,
                triggers, watchers)
 from .backends.claude import ClaudeBackend
 from .desktop import calendar, notes, obsidian, projects, todo
@@ -61,6 +61,7 @@ class Daemon:
         self.store = Store()
         self.clients: set[asyncio.StreamWriter] = set()
         self.backends: dict[str, ClaudeBackend] = {}
+        self.chat_locks: dict[str, asyncio.Lock] = {}
         self.last_active: dict[str, float] = {}
         self.pending: dict[str, str] = {}  # permission request_id -> chat id
         # "Allow for this chat" approvals: chat id -> rule keys (see rule_key)
@@ -142,12 +143,18 @@ class Daemon:
 
     # --- operations ------------------------------------------------------
 
+    def chat_permission_mode(self, chat: dict) -> str:
+        # Legacy chats retain their configured mode, not a newly selected default.
+        return permissions.validate(chat.get("permission_mode")
+                                    or config.load_config()["agents"]["claude"]["permission_mode"])
+
     def backend_for(self, chat: dict) -> ClaudeBackend:
         if chat["id"] not in self.backends:
             cfg = config.load_config()
             if chat["agent"] != "claude":
                 raise ValueError(f"Agent '{chat['agent']}' is not supported yet")
-            agent_cfg = {**cfg["agents"]["claude"], "model": chat.get("model") or config.default_model()}
+            agent_cfg = {**cfg["agents"]["claude"], "model": chat.get("model") or config.default_model(),
+                         "permission_mode": self.chat_permission_mode(chat)}
             extra = [chat["cwd"]] if chat.get("cwd") else []
             self.backends[chat["id"]] = ClaudeBackend(
                 self.emitter(chat["id"]), agent_cfg, chat.get("session_id"), extra)
@@ -157,21 +164,71 @@ class Daemon:
         if config.load_state()["killed"]:
             raise PermissionError("Kill switch is on. Turn it off with `gecko kill off`.")
         chat = self.store.get(req["chat"]) if req.get("chat") else None
+        if req.get("chat") and chat is None:
+            raise ValueError("Unknown chat")
         atts = attachments.validate(req.get("attachments"))
+        mode = permissions.validate(req["permission_mode"]) if "permission_mode" in req else None
         if not chat:
             title = (req["text"].strip().splitlines() or [""])[0][:60] or (atts[0]["name"] if atts else "New chat")
             agent = req.get("agent", "claude")
             chat = self.store.create(agent, req.get("model") or config.default_model(agent), title, req.get("cwd"))
+            chat["permission_mode"] = mode or config.default_permission_mode()
+            self.store.update(chat["id"], permission_mode=chat["permission_mode"])
             # nonce lets the client that sent this adopt the new chat id
             await self.broadcast({"event": "chat_created", **chat, "chat": chat["id"], "nonce": req.get("nonce")})
-        backend = self.backend_for(chat)
-        await self.emitter(chat["id"])("user_message", {"text": req["text"],
+        elif mode is not None and mode != self.chat_permission_mode(chat):
+            raise ValueError("Use set_permission_mode before sending to an existing chat")
+        async with self.chat_locks.setdefault(chat["id"], asyncio.Lock()):
+            # Re-read after waiting for another client to finish changing permissions.
+            chat = self.store.get(chat["id"]) or chat
+            backend = self.backend_for(chat)
+            if backend.busy:
+                raise ValueError("This chat is already running")
+            await self.emitter(chat["id"])("user_message", {"text": req["text"],
                                                          "attachments": attachments.summary(atts)})
-        content = await asyncio.to_thread(attachments.to_content, req["text"], atts)
-        access.require()  # attachments may take time; do not restart an agent after kill
-        await backend.prompt(content)
-        self.store.update(chat["id"])
+            content = await asyncio.to_thread(attachments.to_content, req["text"], atts)
+            access.require()  # attachments may take time; do not restart an agent after kill
+            await backend.prompt(content)
+            self.store.update(chat["id"])
         return {"chat": chat["id"]}
+
+    async def op_permissions(self, req: dict) -> dict:
+        chat = self.store.get(req["chat"]) if req.get("chat") else None
+        if req.get("chat") and chat is None:
+            raise ValueError("Unknown chat")
+        mode = self.chat_permission_mode(chat) if chat else config.default_permission_mode()
+        return {"modes": permissions.MODES, "default": config.default_permission_mode(), "mode": mode,
+                "backend": "claude", "sandbox": False}
+
+    async def op_set_permission_mode(self, req: dict) -> dict:
+        mode = permissions.validate(req["mode"])
+        chat_id = req["chat"]
+        lock = self.chat_locks.setdefault(chat_id, asyncio.Lock())
+        if lock.locked():
+            raise ValueError("Wait for the current chat operation before changing permissions")
+        async with lock:
+            chat = self.store.get(chat_id)
+            if chat is None:
+                raise ValueError("Unknown chat")
+            backend = self.backends.get(chat_id)
+            if backend and backend.busy:
+                raise ValueError("Stop the current turn before changing permissions")
+            if mode != self.chat_permission_mode(chat):
+                if backend:
+                    await backend.close()
+                    self.backends.pop(chat_id, None)
+                await self.expire_permissions(chat_id)
+                self.chat_allows.pop(chat_id, None)
+                self.store.update(chat_id, permission_mode=mode)
+                activity.log("permission_mode", chat=chat_id, mode=mode)
+            await self.broadcast({"event": "chat_updated", "chat": chat_id, "permission_mode": mode})
+        return {"mode": mode}
+
+    async def op_set_default_permission_mode(self, req: dict) -> dict:
+        config.set_default_permission_mode(req["mode"])
+        mode = config.default_permission_mode()
+        await self.broadcast({"event": "default_permission_mode", "mode": mode})
+        return {"mode": mode}
 
     def auto_decision(self, chat_id: str, data: dict) -> tuple[bool, str] | None:
         """(allow, decided_by) when a request needs no prompt; saved rules first."""
@@ -180,6 +237,9 @@ class Daemon:
             return False, "kill_switch"
         if call_key(tool, inp) in self.turn_denials.get(chat_id, ()):
             return False, "repeat"
+        backend = self.backends.get(chat_id)
+        if backend and backend.cfg.get("permission_mode") == "dontAsk":
+            return False, "dontAsk"
         decision = rules.decide(tool, inp)
         if decision == "deny":
             return False, "rule"
@@ -272,6 +332,7 @@ class Daemon:
         b = self.backends.get(req["chat"])
         pending = [rid for rid, c in self.pending.items() if c == req["chat"]]
         return {"chat": chat, "entries": self.store.transcript(req["chat"]),
+                "permission_mode": self.chat_permission_mode(chat) if chat else None,
                 "busy": bool(b and b.busy), "pending_permissions": pending,
                 "taint": self.taint.get(req["chat"])}
 
@@ -287,6 +348,7 @@ class Daemon:
         state = config.load_state()
         return {"killed": state["killed"], "capabilities": state["capabilities"],
                 "capability_descriptions": config.CAPABILITIES, "default_model": config.default_model(),
+                "default_permission_mode": config.default_permission_mode(),
                 "budget": budget.status(self.usage),
                 "features": {"desktop_notes": notes.available()},
                 "running": list(self.backends), "usage": self.usage, "pid": os.getpid()}

@@ -44,6 +44,9 @@ class Store:
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(chats)")}
         if "model" not in cols:  # added after 0.1
             self.db.execute("ALTER TABLE chats ADD COLUMN model TEXT")
+        if "permission_mode" not in cols:
+            self.db.execute("ALTER TABLE chats ADD COLUMN permission_mode TEXT")
+        self.db.commit()
         inbox_cols = {r["name"] for r in self.db.execute("PRAGMA table_info(inbox)")}
         if "flagged" not in inbox_cols:
             self.db.execute("ALTER TABLE inbox ADD COLUMN flagged INTEGER DEFAULT 0")

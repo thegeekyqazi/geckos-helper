@@ -9,7 +9,7 @@ import json
 import uuid
 from typing import Any
 
-from .. import access, agent_process, paths
+from .. import access, agent_process, paths, permissions
 from ..config import expand
 from . import Emit
 
@@ -60,7 +60,7 @@ class ClaudeBackend:
             "--input-format", "stream-json", "--output-format", "stream-json",
             "--verbose", "--include-partial-messages",
             "--permission-prompt-tool", "stdio",
-            "--permission-mode", c.get("permission_mode", "default"),
+            "--permission-mode", permissions.native(c.get("permission_mode", "default")),
             "--append-system-prompt-file", str(paths.SYSTEM_PROMPT_FILE),
             "--mcp-config", str(paths.MCP_CONFIG_FILE),
             "--settings", str(paths.CLAUDE_SETTINGS),

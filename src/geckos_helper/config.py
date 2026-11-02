@@ -6,6 +6,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from . import permissions
+
 from . import paths
 
 DEFAULT_CONFIG = """\
@@ -129,6 +131,18 @@ def default_model(agent: str = "claude") -> str:
 def set_default_model(model: str, agent: str = "claude") -> None:
     state = load_state()
     state.setdefault("default_models", {})[agent] = model
+    save_state(state)
+
+
+def default_permission_mode() -> str:
+    return permissions.validate(load_state().get("default_permission_mode")
+                                or load_config()["agents"]["claude"]["permission_mode"])
+
+
+def set_default_permission_mode(mode: str) -> None:
+    mode = permissions.validate(mode)
+    state = load_state()
+    state["default_permission_mode"] = mode
     save_state(state)
 
 
