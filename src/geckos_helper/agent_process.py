@@ -10,10 +10,10 @@ from . import access
 ACTIVE: set[asyncio.Task] = set()
 
 
-async def stop(proc) -> None:
+async def stop(proc, *, force: bool = False) -> None:
     # Each invocation gets its own session; stop MCP descendants as well as the CLI.
     with contextlib.suppress(ProcessLookupError):
-        os.killpg(proc.pid, signal.SIGTERM)
+        os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
     try:
         await asyncio.wait_for(proc.wait(), 2)
     except TimeoutError:

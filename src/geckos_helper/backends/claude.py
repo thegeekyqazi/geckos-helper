@@ -132,6 +132,15 @@ class ClaudeBackend:
             await self._send({"type": "control_request", "request_id": str(uuid.uuid4()),
                               "request": {"subtype": "interrupt"}})
 
+    async def stop_for_review(self) -> None:
+        """Stop without joining the reader, which may be awaiting this guard scan."""
+        self._closing = True
+        self.busy = False
+        if self.proc is None and self._spawn_task is not None:
+            self.proc = await asyncio.shield(self._spawn_task)
+        if self.proc is not None:
+            await agent_process.stop(self.proc, force=True)
+
     async def close(self) -> None:
         self._closing = True
         if self.proc is None and self._spawn_task is not None:
@@ -159,7 +168,7 @@ class ClaudeBackend:
                 await self._handle(msg)
         finally:
             await self.proc.wait()
-            if self.proc.returncode not in (0, None) and self.busy:
+            if self.proc.returncode not in (0, None) and self.busy and not self._closing:
                 err = STDERR_LOG.read_text(errors="replace")[-2000:]
                 await self.emit("error", {"message": f"claude exited with {self.proc.returncode}: {err}"})
             self.busy = False

@@ -4,8 +4,7 @@ Every tool result is scanned with cheap patterns. Strong signals (e.g. "ignore
 previous instructions", `curl … | sh`, hidden Unicode tag characters) mark it
 suspicious right away; a single weak signal can be double-checked by a small model
 ([guard] model_check in config.toml). A suspicious result taints the chat: from then
-on every action needs explicit approval with a warning, and saved "allow" rules and
-"this chat" approvals are ignored for that chat.
+on the interactive agent is stopped and the chat is blocked until explicit review.
 """
 
 import asyncio
@@ -29,8 +28,9 @@ PATTERNS: list[tuple[str, int, str]] = [
     (r"\b(run|execute|paste)\b.{0,30}\b(command|script|code|terminal|shell)\b", 1, "asks to run a command"),
     (r"(curl|wget)\s[^\n|]{0,200}\|\s*(ba|z)?sh\b|base64\s+(-d|--decode)[^\n]{0,80}\|\s*(ba)?sh", 2,
      "pipe-to-shell command"),
-    (r"\b(do not|don't|never)\s+(tell|inform|mention|show|alert)\b.{0,20}\b(the )?user\b|without (telling|asking) the user",
+    (r"\b(do not|don't|never)\s+(tell|inform|mention|show|alert)\b.{0,20}\b(the )?user\b|without telling the user",
      2, "asks to hide something from the user"),
+    (r"\bwithout asking the user\b", 1, "asks to skip user approval"),
     (r"\b(send|forward|upload|post|email|exfiltrate)\b.{0,60}\b(password|credential|api[ _-]?key|token|"
      r"ssh key|private key|\.env|cookie|secret)s?\b", 2, "asks to send secrets"),
     (r"[\U000E0000-\U000E007F]", 2, "hidden Unicode tag characters"),

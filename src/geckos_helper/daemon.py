@@ -71,6 +71,7 @@ class Daemon:
         self.request_info: dict[str, dict] = {}  # request_id -> the permission_request
         # Injection guard: tool names by call id, scans in flight, and tainted chats
         self.tool_names: dict[str, str] = {}
+        self.tool_sources: dict[str, str] = {}
         self.scans: dict[str, list[asyncio.Task]] = {}
         self.taint: dict[str, dict] = load_taint()
         self.usage: dict[str, Any] = {}
@@ -99,17 +100,22 @@ class Daemon:
                 self.store.update(chat_id, session_id=data["session_id"])
             elif kind == "tool_call":
                 self.tool_names[data["id"]] = data["name"]
+                if data["name"] == "Read":
+                    inp = data.get("input", {})
+                    self.tool_sources[data["id"]] = inp.get("file_path") or data["name"]
             elif kind == "tool_call_update" and data.get("output"):
                 name = self.tool_names.get(data["id"], "")
                 self.scans.setdefault(chat_id, []).append(
-                    asyncio.create_task(self.guard_scan(chat_id, name, data["output"])))
+                    asyncio.create_task(self.guard_scan(chat_id, name, data["output"],
+                                                        self.tool_sources.pop(data["id"], None))))
             elif kind == "permission_request":
                 # Decide only after every pending scan of what the agent just read
                 await asyncio.gather(*self.scans.pop(chat_id, []), return_exceptions=True)
-                if taint := self.taint.get(chat_id):
-                    data["warning"] = (f"Gecko read content from {taint['source']} that looked like a prompt "
-                                       f"injection ({', '.join(taint['reasons'])}). Saved rules are paused "
-                                       "for this chat; only allow this if you asked for it.")
+                if chat_id in self.taint:
+                    if (backend := self.backends.get(chat_id)) and backend.alive:
+                        await backend.respond_permission(data["request_id"], False,
+                            "Gecko stopped this chat for guard review. Do not retry or work around it.")
+                    return
                 if auto := self.auto_decision(chat_id, data):
                     allow, by = auto
                     note = " You already asked for this exact action." if by == "repeat" else ""
@@ -149,6 +155,7 @@ class Daemon:
                                     or config.load_config()["agents"]["claude"]["permission_mode"])
 
     def backend_for(self, chat: dict) -> ClaudeBackend:
+        self.require_guard_review(chat["id"])
         if chat["id"] not in self.backends:
             cfg = config.load_config()
             if chat["agent"] != "claude":
@@ -159,6 +166,10 @@ class Daemon:
             self.backends[chat["id"]] = ClaudeBackend(
                 self.emitter(chat["id"]), agent_cfg, chat.get("session_id"), extra)
         return self.backends[chat["id"]]
+
+    def require_guard_review(self, chat_id: str) -> None:
+        if chat_id in self.taint:
+            raise PermissionError("This chat is paused for guard review. Review and clear the warning before continuing.")
 
     async def op_send(self, req: dict) -> dict:
         if config.load_state()["killed"]:
@@ -179,6 +190,8 @@ class Daemon:
         elif mode is not None and mode != self.chat_permission_mode(chat):
             raise ValueError("Use set_permission_mode before sending to an existing chat")
         async with self.chat_locks.setdefault(chat["id"], asyncio.Lock()):
+            await asyncio.gather(*self.scans.pop(chat["id"], []), return_exceptions=True)
+            self.require_guard_review(chat["id"])
             # Re-read after waiting for another client to finish changing permissions.
             chat = self.store.get(chat["id"]) or chat
             backend = self.backend_for(chat)
@@ -188,6 +201,7 @@ class Daemon:
                                                          "attachments": attachments.summary(atts)})
             content = await asyncio.to_thread(attachments.to_content, req["text"], atts)
             access.require()  # attachments may take time; do not restart an agent after kill
+            self.require_guard_review(chat["id"])
             await backend.prompt(content)
             self.store.update(chat["id"])
         return {"chat": chat["id"]}
@@ -243,31 +257,52 @@ class Daemon:
         decision = rules.decide(tool, inp)
         if decision == "deny":
             return False, "rule"
-        if chat_id in self.taint:  # possible injection: no automatic allows
-            return None
+        if chat_id in self.taint:
+            return False, "guard_review"
         if decision == "allow":
             return True, "rule"
         if rule_key(tool, inp) in self.chat_allows.get(chat_id, ()):
             return True, "chat"
         return None
 
-    async def guard_scan(self, chat_id: str, tool: str, output: str) -> None:
+    async def guard_scan(self, chat_id: str, tool: str, output: str, source: str | None = None) -> None:
         third_party = (tool in ("WebFetch", "WebSearch") or tool.startswith("mcp__claude_ai_")
                        or "<untrusted-content" in output)
         verdict = await guard.scan(output, allow_model=third_party)
         if not verdict.suspicious:
             return
-        source = tool.replace("mcp__", "").replace("__", ": ") or "a tool"
-        self.taint[chat_id] = {"source": source, "reasons": verdict.reasons, "ts": time.time()}
-        save_taint(self.taint)
+        if self.taint.get(chat_id, {}).get("review_required"):
+            return
+        source = source or tool.replace("mcp__", "").replace("__", ": ") or "a tool"
+        self.taint[chat_id] = {"source": source, "reasons": verdict.reasons, "ts": time.time(),
+                              "review_required": True}
+        try:
+            save_taint(self.taint)
+        except OSError:
+            log.exception("failed to persist guard review for %s", chat_id)
+        backend = self.backends.get(chat_id)
+        paused = not backend or not backend.alive
+        if backend:
+            try:
+                await backend.stop_for_review()
+                paused = True
+            except Exception:
+                log.exception("failed to stop guarded chat %s", chat_id)
         activity.log("guard", chat=chat_id, source=source, reasons=verdict.reasons)
-        await self.emitter(chat_id)("guard_alert", {"source": source, "reasons": verdict.reasons})
+        await self.emitter(chat_id)("guard_alert", {"source": source, "reasons": verdict.reasons, "paused": paused})
 
     async def op_untaint(self, req: dict) -> dict:
         """The user reviewed a guard alert and clears it for this chat."""
+        await asyncio.gather(*self.scans.pop(req["chat"], []), return_exceptions=True)
+        if req["chat"] in self.taint and (backend := self.backends.get(req["chat"])):
+            await backend.close()
+            self.backends.pop(req["chat"], None)
+        await self.expire_permissions(req["chat"])
+        self.chat_allows.pop(req["chat"], None)
         self.taint.pop(req["chat"], None)
         save_taint(self.taint)
         activity.log("guard", chat=req["chat"], source="you", reasons=["warning cleared"])
+        await self.broadcast({"event": "guard_cleared", "chat": req["chat"]})
         return {}
 
     async def op_permission(self, req: dict) -> dict:
@@ -277,6 +312,8 @@ class Daemon:
         chat_id = self.pending.get(req["request_id"])
         if chat_id is None or chat_id not in self.backends:
             raise ValueError("This approval has expired; the agent is no longer waiting")
+        if req["allow"]:
+            self.require_guard_review(chat_id)
         self.pending.pop(req["request_id"])
         backend = self.backends[chat_id]
         info = self.request_info.pop(req["request_id"], {})

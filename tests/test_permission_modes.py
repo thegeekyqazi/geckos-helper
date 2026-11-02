@@ -122,7 +122,7 @@ class ModeLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(config, "default_model", return_value="sonnet"), \
                 patch.object(daemon.attachments, "validate", return_value=[]), \
                 patch.object(daemon.attachments, "summary", return_value=[]), \
-                patch.object(daemon.attachments, "to_content", return_value="fixture"), \
+                patch.object(daemon.asyncio, "to_thread", new_callable=AsyncMock, return_value="fixture"), \
                 patch.object(daemon.access, "require"):
             await self.d.op_send({"text": "fixture", "permission_mode": "plan"})
         self.d.store.update.assert_any_call("fixture", permission_mode="plan")
