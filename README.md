@@ -139,9 +139,11 @@ it does not implement Codex's independent `read-only`, `workspace-write` or
 `danger-full-access` OS sandboxes, nor Codex's approval reviewer. Auto uses Claude's
 actual classifier, not an unconditional Gecko approval rule.
 
-Full access permits actions without the usual review. Gecko's saved rules and guard
-warnings can gate only requests Claude sends to the host; native auto-approved calls
-do not pass through that gate. Native Claude settings and managed policies still apply.
+Full access permits actions without the usual review. Gecko's saved rules can gate
+only requests Claude sends to the host; native auto-approved calls do not pass through
+that gate. Separately, a detected guard warning stops the affected chat and blocks
+further messages until you explicitly review and clear it, in every permission mode.
+Native Claude settings and managed policies still apply.
 Capability switches constrain Gecko integrations, not shell/file tools or other MCP
 servers. The kill switch remains available. Background watchers and recipes keep their
 separate restricted, read-only profile regardless of chat/default mode.
@@ -179,9 +181,12 @@ gecko permissions default --default         # restore Manual for new chats
   removed in Settings.
 - **Injection guard**: every tool result is scanned for prompt-injection patterns
   (borderline third-party content gets a Haiku second opinion). A hit shows a red
-  card and taints the chat: saved "allow" rules and "this chat" approvals pause, and
-  requests reaching Gecko need your approval with a warning, until you clear it.
-  Native auto-approvals in more permissive modes do not pass through this gate.
+  card, force-stops that chat's agent process group and blocks further messages until
+  you explicitly review and clear it. Auto, Full access and saved allows cannot bypass
+  this review block. Clearing keeps your selected mode and resumes on your next message.
+  Scanning follows tool output, so actions started before detection cannot be undone.
+  Ordinary autonomy wording such as "without asking the user" is a weak signal, not
+  sufficient on its own to label a local file as injection or concealment.
 - **Unattended runs are read-only** (watchers now, recipes later): web search, web
   fetch only for domains the watcher lists, Gecko's read-only tools, no shell or
   file edits, nothing prompted (`dontAsk`), only the gecko MCP server, which itself

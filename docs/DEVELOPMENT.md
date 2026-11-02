@@ -101,6 +101,15 @@ auto/bypass behavior is emulated by Gecko; exceptions still reaching the host re
 normal approval handling. A `dontAsk` callback is denied even with taint/saved allows.
 Unattended profiles do not read interactive permission defaults. Gecko has no OS sandbox.
 
+Guard detection is independent of native permissions: save the taint, force-stop the
+affected backend via `stop_for_review`, and reject sends/backend creation/approval allows
+until `untaint` is explicitly called. The stop must not await the stdout reader: that
+reader may itself be awaiting the scan before processing a permission callback. Clearing
+waits for scans and old backend cleanup before removing taint, expires approvals and
+clears chat-scoped allows. Read warnings retain their file path as source. UI receives
+`guard_alert.paused` and `guard_cleared`; historical taints also block future sends. This
+is an after-output detection/stop, not a pre-execution sandbox or rollback of completed work.
+
 `PermissionPicker.qml` is shared by composer and settings. The UI waits for successful
 mode-change responses and clears its busy flag on rejection/disconnect. It ignores late
 chat-change responses if another chat has been opened. Backend errors (including unavailable
