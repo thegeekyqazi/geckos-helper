@@ -55,6 +55,8 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **Quick ask** on **Super+Space**: a small box in the middle of the screen; Enter starts a
   chat, and / commands work there too.
 - Model picker in the composer; the star sets the default for new chats (Sonnet out of the box)
+- Permission mode picker below the composer; **Settings → Permissions** sets the default
+  for new chats. `/permissions` opens those settings.
 - **Themes in Lua** with live reload and a theme switcher button; see [docs/THEMES.md](docs/THEMES.md)
 - **Projects** page: your vault's projects and goals with progress and next task, plus your ideas list
 - **Inbox** for recipe reports (the daily briefing arrives at 8:00), with an unread badge
@@ -101,7 +103,7 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **Permission prompts go to you.** Claude runs with `--permission-prompt-tool stdio`, so
   every "may I run this?" comes to the daemon and on to the UI as an
   approve/deny request. The read-only desktop tools are pre-approved in the
-  profile settings; anything that writes asks first.
+  profile settings; in Manual mode, other actions use Claude Code's approval checks.
 - **Context file.** `gecko context` writes a short, hand-picked description of
   this machine: installed tools from [`profile/tools.toml`](src/geckos_helper/profile/tools.toml),
   MCP servers, skills, disabled capabilities, and what's new this week. A daily
@@ -111,6 +113,48 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
   so ACP agents (`opencode acp`, codex-acp) can be added without UI changes.
 
 ## Security model
+
+### Permission modes
+
+The picker uses [Claude Code's native permission modes](https://code.claude.com/docs/en/permissions).
+Each chat saves its own choice. Stop a running turn before changing it; an idle agent
+closes and resumes with the selected mode on the next message. Changing the default
+does not alter existing chats. The initial default stays Manual.
+
+| Picker | Native mode | Behavior |
+|---|---|---|
+| Manual | `default` / `manual` | Normal approval prompts |
+| Accept edits | `acceptEdits` | Accept edits and common filesystem operations in working directories |
+| Plan | `plan` | Native planning and exploration behavior |
+| Auto | `auto` | Claude's classifier reviews actions; requires backend/model/account support |
+| Don't ask | `dontAsk` | Deny calls that need approval; native preapproved actions still run |
+| Full access | `bypassPermissions` | Skip native checks, including protected-path writes |
+
+There is no silent fallback if Claude rejects a mode. Its error appears in the chat.
+The canonical `default` choice is passed to current Claude Code as `manual`.
+
+Like [Codex's permissions control](https://developers.openai.com/codex/agent-approvals-security),
+the picker keeps approval behavior visible. **Gecko currently runs Claude Code only:**
+it does not implement Codex's independent `read-only`, `workspace-write` or
+`danger-full-access` OS sandboxes, nor Codex's approval reviewer. Auto uses Claude's
+actual classifier, not an unconditional Gecko approval rule.
+
+Full access permits actions without the usual review. Gecko's saved rules and guard
+warnings can gate only requests Claude sends to the host; native auto-approved calls
+do not pass through that gate. Native Claude settings and managed policies still apply.
+Capability switches constrain Gecko integrations, not shell/file tools or other MCP
+servers. The kill switch remains available. Background watchers and recipes keep their
+separate restricted, read-only profile regardless of chat/default mode.
+
+```sh
+gecko permissions                           # show modes and default
+gecko permissions acceptEdits --default     # new chats only
+gecko permissions plan --chat CHAT_ID       # idle existing chat
+gecko permissions bypassPermissions --chat CHAT_ID
+gecko permissions default --default         # restore Manual for new chats
+```
+
+### Gecko tool controls
 
 - **Notifications, calendar entries, clipboard, web pages and files are data, not
   instructions.** MCP tools wrap third-party text in `<untrusted-content>`, and
@@ -136,7 +180,8 @@ to show your events. What the two share: [docs/INTEGRATION.md](docs/INTEGRATION.
 - **Injection guard**: every tool result is scanned for prompt-injection patterns
   (borderline third-party content gets a Haiku second opinion). A hit shows a red
   card and taints the chat: saved "allow" rules and "this chat" approvals pause, and
-  every action needs your approval with a warning, until you clear it.
+  requests reaching Gecko need your approval with a warning, until you clear it.
+  Native auto-approvals in more permissive modes do not pass through this gate.
 - **Unattended runs are read-only** (watchers now, recipes later): web search, web
   fetch only for domains the watcher lists, Gecko's read-only tools, no shell or
   file edits, nothing prompted (`dontAsk`), only the gecko MCP server, which itself

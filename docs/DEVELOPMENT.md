@@ -88,6 +88,24 @@ Quickshell panel (qs -c gecko)  ──unix socket, JSON lines──►  gecko da
 
 ## Safety regression tests
 
+Interactive permission modes live in `permissions.py`. The daemon validates mode IDs,
+pins new-chat choices in SQLite `chats.permission_mode`, and saves only the new-chat
+default in `state.json`. Legacy NULL modes use `config.toml`'s configured mode, not the
+UI default. `manual` normalizes to `default`; launches use Claude's native `manual`.
+`permissions`, `set_permission_mode` and `set_default_permission_mode` are socket ops.
+Chat/default changes broadcast `chat_updated.permission_mode` / `default_permission_mode`.
+Send/startup and mode changes share a per-chat lock. Changes reject busy/starting chats;
+idle changes close the backend, expire approvals and clear chat-scoped allows before
+persisting. Resume uses the existing session ID and selected native mode. No native
+auto/bypass behavior is emulated by Gecko; exceptions still reaching the host retain
+normal approval handling. A `dontAsk` callback is denied even with taint/saved allows.
+Unattended profiles do not read interactive permission defaults. Gecko has no OS sandbox.
+
+`PermissionPicker.qml` is shared by composer and settings. The UI waits for successful
+mode-change responses and clears its busy flag on rejection/disconnect. It ignores late
+chat-change responses if another chat has been opened. Backend errors (including unavailable
+Auto mode) are shown rather than downgrading or escalating silently.
+
 Run `python -m unittest discover -s tests -v` in the project's Python environment.
 The suite uses temporary files and mocked desktop/agent integrations; process-lifecycle
 checks launch only local Python fixtures, never Claude or external services. It covers
