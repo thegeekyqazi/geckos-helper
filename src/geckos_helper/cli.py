@@ -131,6 +131,10 @@ def main() -> None:
     m.add_argument("name", nargs="?")
     m.add_argument("--default", action="store_true", help="make it the default for new chats")
     m.add_argument("--chat", help="switch this chat to the model")
+    pm = sub.add_parser("permissions", help="show or select a native Claude Code permission mode")
+    pm.add_argument("mode", nargs="?", help="default, acceptEdits, plan, auto, dontAsk, bypassPermissions")
+    pm.add_argument("--chat", help="show or change permissions for this chat")
+    pm.add_argument("--default", action="store_true", help="use the mode for new chats")
     hx = sub.add_parser("handoff", help="copy a chat to the clipboard to continue elsewhere")
     hx.add_argument("chat", nargs="?", help="chat id (default: most recent)")
     hx.add_argument("--brief", action="store_true", help="have a small model write a hand-off brief")
@@ -149,6 +153,23 @@ def main() -> None:
 
     try:
         match args.cmd:
+            case "permissions":
+                if args.mode:
+                    if bool(args.chat) == bool(args.default):
+                        raise ValueError("Choose --chat ID or --default when setting a mode")
+                    op = "set_permission_mode" if args.chat else "set_default_permission_mode"
+                    kw = {"mode": args.mode}
+                    if args.chat:
+                        kw["chat"] = args.chat
+                    result = asyncio.run(cmd_simple(op, **kw))
+                    print(f"Permission mode: {result['mode']}")
+                else:
+                    kw = {"chat": args.chat} if args.chat else {}
+                    result = asyncio.run(cmd_simple("permissions", **kw))
+                    print(f"Current: {result['mode']}  Default for new chats: {result['default']}")
+                    for mode in result["modes"]:
+                        print(f"  {mode['id']:18} {mode['label']} — {mode['description']}")
+                    print("Claude Code approvals; no Codex OS sandbox. Background jobs stay read-only.")
             case "daemon":
                 from .daemon import main as daemon_main
                 daemon_main()
