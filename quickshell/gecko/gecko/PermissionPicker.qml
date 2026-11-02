@@ -31,8 +31,15 @@ ColumnLayout {
         }
         currentIndex: Gecko.permissionModes.findIndex(m => m.id === root.selected)
         Accessible.name: root.forDefault ? "Default permissions for new chats" : "Chat permissions"
-        onActivated: Gecko.setPermissionMode(currentValue, root.forDefault)
-        popup.height: Math.min(popup.implicitHeight, 260)
+        onActivated: {
+            const mode = currentValue;
+            // ComboBox changes its index before activation. Keep the display tied
+            // to the confirmed mode even when the daemon rejects the request.
+            currentIndex = Qt.binding(() => Gecko.permissionModes.findIndex(m => m.id === root.selected));
+            Gecko.setPermissionMode(mode, root.forDefault);
+        }
+        // The style sets popup.height, not implicitHeight (which can be zero).
+        popup.height: Math.min(popup.contentItem.implicitHeight + popup.topPadding + popup.bottomPadding, 260)
     }
     GText {
         Layout.fillWidth: true

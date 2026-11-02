@@ -119,3 +119,14 @@ It does not render Qt or operate the desktop. For visual QA, use an isolated Qui
 config with synthetic chat state and a private XDG_STATE_HOME; never test against personal
 chats, notes or calendars. The panel source is symlinked live, so stage QML edits in a
 worktree and check its logs/CPU after activation. Do not reload the main end-4 shell.
+
+`tests/permission_picker_input.qml` adds real QtTest mouse clicks for the composer and
+Settings pickers at 705px/150% and 360px/200%. Copy it into the isolated config with a
+staged `qs.gecko` module, disabled socket and end-4 test stubs. It refuses to run outside
+`XDG_RUNTIME_DIR=/tmp/gecko-ui-qa/runtime` and `XDG_STATE_HOME=/tmp/gecko-ui-qa/state`.
+Use `QT_QPA_PLATFORM=offscreen QSG_RHI_BACKEND=software timeout 12s qs -p <copied-fixture>`.
+Its `/tmp/gecko-ui-qa/permission-click-matrix.json` must have every `passed` value true.
+Checks include visible bounded popup height, all six choices, scrolling/clicking the last
+choice, selection/close, and preserving the saved-mode display after a rejected change.
+Do not replace these with closed-control screenshots: a popup can be logically visible
+with zero height. Size ComboBox popups from content plus padding, not their implicitHeight.
