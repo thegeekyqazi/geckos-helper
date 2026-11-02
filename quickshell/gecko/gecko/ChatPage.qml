@@ -12,7 +12,7 @@ Item {
     }
 
     function submit() {
-        if (Gecko.busy || (!input.text.trim().length && !Gecko.attachments.length)) return;
+        if (Gecko.busy || Gecko.changingPermissions || (!input.text.trim().length && !Gecko.attachments.length)) return;
         Gecko.send(input.text);
         input.text = "";
     }
@@ -273,6 +273,7 @@ Item {
                         }
                     }
                 }
+                PermissionPicker { Layout.fillWidth: true; compact: true }
             }
         }
     }

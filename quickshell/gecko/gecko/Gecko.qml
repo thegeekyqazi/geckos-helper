@@ -25,6 +25,11 @@ Singleton {
     property var chats: []
     property var models: []
     property string defaultModel: ""
+    property var permissionModes: []
+    property string defaultPermissionMode: ""
+    property string chatPermissionMode: ""
+    property bool changingPermissions: false
+    readonly property string permissionMode: chatPermissionMode || defaultPermissionMode
     property var usage: ({})
     property bool killed: false
     property var capabilities: ({})
@@ -136,6 +141,7 @@ Singleton {
                 root.chatId = ev.chat;
                 root.chatTitle = ev.title;
                 root.chatModel = ev.model;
+                root.chatPermissionMode = ev.permission_mode || root.defaultPermissionMode;
                 root.pendingNonce = "";
             }
             root.refreshChats();
@@ -152,6 +158,9 @@ Singleton {
         case "default_model":
             root.defaultModel = ev.model;
             return;
+        case "default_permission_mode":
+            root.defaultPermissionMode = ev.mode;
+            return;
         case "usage":
             root.usage = ev;
             return;
@@ -164,6 +173,7 @@ Singleton {
             return;
         case "chat_updated":
             if (ev.chat === root.chatId && ev.model) root.chatModel = ev.model;
+            if (ev.chat === root.chatId && ev.permission_mode) root.chatPermissionMode = ev.permission_mode;
             return;
         }
         if (ev.chat !== root.chatId) return;
@@ -285,6 +295,7 @@ Singleton {
     // --- actions -------------------------------------------------------------
 
     function refreshAll() {
+        root.refreshPermissions();
         root.refreshChats();
         root.refreshInbox();
         root.call("models", {}, r => {
@@ -307,6 +318,40 @@ Singleton {
 
     function refreshChats() {
         root.call("chats", { limit: 100 }, r => root.chats = r.chats);
+    }
+
+    function refreshPermissions() {
+        const chat = root.chatId;
+        root.call("permissions", chat ? { chat: chat } : {}, r => {
+            root.permissionModes = r.modes;
+            root.defaultPermissionMode = r.default;
+            if (chat && chat === root.chatId) root.chatPermissionMode = r.mode;
+        });
+    }
+
+    function permissionLabel(mode) {
+        return root.permissionModes.find(m => m.id === mode)?.label || "Permissions";
+    }
+
+    function setPermissionMode(mode, asDefault) {
+        if (root.changingPermissions) return;
+        if (!asDefault && root.busy) {
+            root.showToast("Stop the current turn before changing permissions.");
+            return;
+        }
+        if (!asDefault && !root.chatId) {
+            root.chatPermissionMode = mode;
+            return;
+        }
+        const chat = root.chatId;
+        root.changingPermissions = true;
+        const op = asDefault ? "set_default_permission_mode" : "set_permission_mode";
+        const args = asDefault ? { mode: mode } : { chat: chat, mode: mode };
+        root.call(op, args, r => {
+            if (asDefault) root.defaultPermissionMode = r.mode;
+            else if (chat === root.chatId) root.chatPermissionMode = r.mode;
+            root.changingPermissions = false;
+        }, () => root.changingPermissions = false);
     }
 
     // --- attachments ----------------------------------------------------------
@@ -378,6 +423,7 @@ Singleton {
         { name: "projects", arg: "", desc: "Projects, goals and ideas", run: a => root.page = "projects" },
         { name: "next", arg: "", desc: "What should I work on next?", run: a => root.send("What should I work on next across my projects, given my calendar and deadlines? Suggest a few to-dos.") },
         { name: "settings", arg: "", desc: "Capabilities and rules", run: a => root.page = "settings" },
+        { name: "permissions", arg: "", desc: "Choose a permission mode and default", run: a => root.page = "settings" },
         { name: "kill", arg: "", desc: "Toggle the kill switch", run: a => root.setKilled(!root.killed) },
     ]
 
@@ -410,6 +456,10 @@ Singleton {
     }
 
     function send(text) {
+        if (root.changingPermissions) {
+            root.showToast("Wait for the permission change to finish.");
+            return;
+        }
         text = text.trim();
         if (!text.length && !root.attachments.length) return;
         if (text.startsWith("/") && root.runCommand(text)) return;
@@ -421,6 +471,7 @@ Singleton {
             root.pendingNonce = `${Date.now()}-${Math.random()}`;
             args.nonce = root.pendingNonce;
             args.model = root.chatModel || root.defaultModel;
+            if (root.permissionMode) args.permission_mode = root.permissionMode;
         }
         root.call("send", args);
     }
@@ -441,6 +492,7 @@ Singleton {
         root.chatId = "";
         root.chatTitle = "";
         root.chatModel = root.defaultModel;
+        root.chatPermissionMode = "";
         root.busy = false;
         root.tainted = false;
         messages.clear();
@@ -452,6 +504,7 @@ Singleton {
             root.chatId = id;
             root.chatTitle = r.chat.title;
             root.chatModel = r.chat.model || root.defaultModel;
+            root.chatPermissionMode = r.permission_mode || root.defaultPermissionMode;
             root.busy = r.busy;
             root.tainted = !!r.taint;
             messages.clear();

@@ -67,3 +67,43 @@ size.setZoom(99); assert.equal(prefs.zoom, 2);
 size.setZoom(NaN); assert.equal(prefs.zoom, 2);
 size.resetWidth(); assert.equal(prefs.panelWidth, 0);
 console.log('QML state checks passed: handoff preview/failures/offline, edited copy, independent sizing and bounds.');
+
+for (const name of ['setPermissionMode', 'permissionLabel', 'refreshPermissions']) {
+    vm.runInContext(extract('Gecko.qml', name), ctx);
+    root[name] = ctx[name];
+}
+socket.connected = true;
+root.permissionModes = [{id: 'default', label: 'Manual'}, {id: 'bypassPermissions', label: 'Full access'}];
+root.chatPermissionMode = 'default';
+root.chatId = 'fixture';
+root.busy = true;
+const beforeMode = writes.length;
+root.setPermissionMode('bypassPermissions', false);
+assert.equal(writes.length, beforeMode);
+root.busy = false;
+root.setPermissionMode('bypassPermissions', false);
+assert.equal(root.chatPermissionMode, 'default'); // only update after success
+assert.equal(root.changingPermissions, true);
+root.handle({reply: writes.at(-1).id, ok: false, error: 'Fixture mode rejection'});
+assert.equal(root.chatPermissionMode, 'default');
+assert.equal(root.changingPermissions, false);
+root.setPermissionMode('bypassPermissions', false);
+root.handle({reply: writes.at(-1).id, ok: true, mode: 'bypassPermissions'});
+assert.equal(root.chatPermissionMode, 'bypassPermissions');
+root.setPermissionMode('default', false);
+root.chatId = 'other-chat';
+root.handle({reply: writes.at(-1).id, ok: true, mode: 'default'});
+assert.equal(root.chatPermissionMode, 'bypassPermissions'); // ignore another chat's late reply
+root.setPermissionMode('default', true);
+root.handle({reply: writes.at(-1).id, ok: true, mode: 'default'});
+assert.equal(root.defaultPermissionMode, 'default');
+assert.equal(root.chatPermissionMode, 'bypassPermissions');
+socket.connected = false;
+root.setPermissionMode('default', false);
+assert.equal(root.changingPermissions, false);
+root.chatId = '';
+root.setPermissionMode('plan', false);
+assert.equal(root.chatPermissionMode, 'plan');
+assert.equal(root.defaultPermissionMode, 'default');
+assert.equal(root.permissionLabel('bypassPermissions'), 'Full access');
+console.log('Permission UI checks passed: busy, rejected/offline changes, confirmed selection, chat isolation, separate default.');

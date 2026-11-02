@@ -6,7 +6,7 @@ import qs.modules.common.widgets
 
 StyledFlickable {
     id: root
-    onVisibleChanged: if (visible) Gecko.refreshRules()
+    onVisibleChanged: if (visible) { Gecko.refreshRules(); Gecko.refreshPermissions(); }
     clip: true
     contentHeight: column.implicitHeight
 
@@ -15,6 +15,23 @@ StyledFlickable {
         x: 14
         width: root.width - 28
         spacing: 6
+
+        GText { text: "Permissions"; rel: 1.15; font.weight: Font.DemiBold }
+        GText { text: "Default for new chats"; font.weight: Font.DemiBold }
+        PermissionPicker { Layout.fillWidth: true; forDefault: true }
+        GText { Layout.fillWidth: true; text: "Current chat"; visible: !!Gecko.chatId; font.weight: Font.DemiBold }
+        PermissionPicker { Layout.fillWidth: true; visible: !!Gecko.chatId }
+        GText {
+            Layout.fillWidth: true
+            text: "Uses Claude Code's native modes. Changes apply on the next message; stop a running turn first. Defaults apply only to new chats. Auto depends on your Claude Code version, model and account."
+            muted: true; rel: 0.8
+        }
+        GText {
+            Layout.fillWidth: true
+            text: "Full access skips native permission checks. Gecko rules and injection warnings can pause only requests Claude sends for approval. Capability switches apply to Gecko tools; they do not restrict shell access. This is not Codex's OS sandbox. Background watchers and recipes remain read-only."
+            muted: true; rel: 0.8
+        }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
         GText { text: "Display"; rel: 1.15; font.weight: Font.DemiBold }
         GText {
