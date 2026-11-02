@@ -116,6 +116,7 @@ Singleton {
         switch (ev.event) {
         case "user_message": busy[ev.chat] = true; break;
         case "turn_end": case "closed": delete busy[ev.chat]; break;
+        case "guard_alert": if (ev.paused) delete busy[ev.chat]; break;
         case "permission_request": pending[ev.request_id] = ev.chat; break;
         case "permission_resolved": delete pending[ev.request_id]; break;
         case "watcher_running": root.watcherRunning = ev.on; return;
@@ -174,6 +175,9 @@ Singleton {
         case "chat_updated":
             if (ev.chat === root.chatId && ev.model) root.chatModel = ev.model;
             if (ev.chat === root.chatId && ev.permission_mode) root.chatPermissionMode = ev.permission_mode;
+            return;
+        case "guard_cleared":
+            if (ev.chat === root.chatId) root.tainted = false;
             return;
         }
         if (ev.chat !== root.chatId) return;
@@ -263,8 +267,10 @@ Singleton {
             break;
         }
         case "guard_alert":
-            messages.append(root.entry({ kind: "guard", title: e.source, text: (e.reasons ?? []).join(", ") }));
+            messages.append(root.entry({ kind: "guard", title: e.source, text: (e.reasons ?? []).join(", "),
+                                        extra: JSON.stringify({ paused: !!e.paused }) }));
             root.tainted = true;
+            if (live && e.paused) root.busy = false;
             break;
         case "turn_end":
         case "closed":
@@ -463,6 +469,10 @@ Singleton {
         text = text.trim();
         if (!text.length && !root.attachments.length) return;
         if (text.startsWith("/") && root.runCommand(text)) return;
+        if (root.tainted) {
+            root.showToast("Review and clear the guard warning before continuing this chat.");
+            return;
+        }
         const args = { text: text, attachments: root.attachments };
         root.attachments = [];
         if (root.chatId) {

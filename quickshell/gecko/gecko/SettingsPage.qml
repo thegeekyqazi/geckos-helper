@@ -28,7 +28,7 @@ StyledFlickable {
         }
         GText {
             Layout.fillWidth: true
-            text: "Full access skips native permission checks. Gecko rules and injection warnings can pause only requests Claude sends for approval. Capability switches apply to Gecko tools; they do not restrict shell access. This is not Codex's OS sandbox. Background watchers and recipes remain read-only."
+            text: "Full access skips native permission checks. Saved rules cover requests Claude sends for approval. A guard detection stops the chat in every mode until you review and clear it. Capability switches apply to Gecko tools; they do not restrict shell access. This is not Codex's OS sandbox. Background watchers and recipes remain read-only."
             muted: true; rel: 0.8
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: 8; Layout.bottomMargin: 8 }

@@ -107,3 +107,37 @@ assert.equal(root.chatPermissionMode, 'plan');
 assert.equal(root.defaultPermissionMode, 'default');
 assert.equal(root.permissionLabel('bypassPermissions'), 'Full access');
 console.log('Permission UI checks passed: busy, rejected/offline changes, confirmed selection, chat isolation, separate default.');
+
+for (const name of ['applyEntry', 'trackGlobal', 'handleEvent', 'send']) {
+    vm.runInContext(extract('Gecko.qml', name), ctx);
+    root[name] = ctx[name];
+}
+const guardEntries = [];
+ctx.messages = {append: e => guardEntries.push(e)};
+root.entry = e => e;
+root.beforeEntry = () => {};
+root.endThoughts = () => {};
+root.scrollToEnd = () => {};
+root.busy = true;
+root.chatId = 'guard-fixture';
+root.applyEntry('guard_alert', {source: '/fixture/data.txt', reasons: ['fixture signal'], paused: true}, true);
+assert.equal(root.tainted, true);
+assert.equal(root.busy, false);
+assert.equal(guardEntries.at(-1).title, '/fixture/data.txt');
+root.attachments = [];
+root.changingPermissions = false;
+const beforeGuardSend = writes.length;
+root.send('continue');
+assert.equal(writes.length, beforeGuardSend);
+root.busyChats = {'guard-fixture': true};
+root.pendingRequests = {};
+root.trackGlobal({event: 'guard_alert', chat: 'guard-fixture', paused: true});
+assert.equal(Object.keys(root.busyChats).length, 0);
+ctx.Gecko = root;
+ctx.input = {text: 'Keep this draft'};
+vm.runInContext(extract('ChatPage.qml', 'submit'), ctx);
+ctx.submit();
+assert.equal(ctx.input.text, 'Keep this draft');
+root.handleEvent({event: 'guard_cleared', chat: 'guard-fixture'});
+assert.equal(root.tainted, false);
+console.log('Guard UI checks passed: review block, stopped state, source label, retained draft and explicit clear event.');

@@ -75,6 +75,7 @@ async def run_turn(client: Client, text: str, chat: str | None, auto: str | None
             pass
         elif kind == "guard_alert":
             print(f"{RED}⚠ Possible prompt injection in {ev['source']}: {', '.join(ev['reasons'])}{END}")
+            print("Chat blocked for review. Review and clear the warning in the panel before continuing.")
         elif kind == "error":
             print(f"{RED}{ev['message']}{END}")
         elif kind == "turn_end":

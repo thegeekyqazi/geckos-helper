@@ -12,7 +12,7 @@ Item {
     }
 
     function submit() {
-        if (Gecko.busy || Gecko.changingPermissions || (!input.text.trim().length && !Gecko.attachments.length)) return;
+        if (Gecko.busy || Gecko.tainted || Gecko.changingPermissions || (!input.text.trim().length && !Gecko.attachments.length)) return;
         Gecko.send(input.text);
         input.text = "";
     }
@@ -194,7 +194,7 @@ Item {
                         color: Theme.text
                         placeholderTextColor: Theme.textMuted
                         enabled: Gecko.connected && !Gecko.killed
-                        placeholderText: Gecko.killed ? "Kill switch is on" : `Message ${Theme.assistantName}…  (/ for commands)`
+                        placeholderText: Gecko.killed ? "Kill switch is on" : Gecko.tainted ? "Review the guard warning to continue" : `Message ${Theme.assistantName}…  (/ for commands)`
                         Keys.onPressed: event => {
                             if (root.paletteOpen) {
                                 const n = root.matches.length;
@@ -255,6 +255,7 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     RippleButton { // Send / stop
+                        enabled: Gecko.busy || !Gecko.tainted
                         implicitWidth: 34
                         implicitHeight: Math.max(34, Theme.fontSize * 1.2 + 12)
                         buttonRadius: Appearance.rounding.full

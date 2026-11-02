@@ -432,26 +432,18 @@ Item {
                 }
                 GText {
                     Layout.fillWidth: true
-                    text: `Found: ${root.text}. Gecko will treat it as data, and every action in this chat now needs your approval (saved rules are paused). Check what it read before allowing anything.`
+                    text: `Found: ${root.text}. ${Gecko.tainted ? "This chat is blocked until you review and clear the warning, including in Auto and Full access. Actions already started may have completed." : "This warning has been cleared for this chat."}`
                     color: Theme.errorText
                     rel: 0.8
                 }
-                RippleButton {
+                TextButton {
+                    objectName: "clearGuardReview"
                     visible: Gecko.tainted
-                    implicitHeight: 30
-                    implicitWidth: clearText.implicitWidth + 24
-                    buttonRadius: Appearance.rounding.full
+                    Layout.maximumWidth: guardCol.width
+                    label: "I reviewed it, clear the warning"
                     colBackground: Qt.alpha(Theme.errorText, 0.15)
                     colBackgroundHover: Qt.alpha(Theme.errorText, 0.25)
                     onClicked: Gecko.clearTaint()
-                    contentItem: GText {
-                        id: clearText
-                        anchors.centerIn: parent
-                        text: "I checked it, clear the warning"
-                        color: Theme.errorText
-                        rel: 0.8
-                        wrapMode: Text.NoWrap
-                    }
                 }
             }
         }
